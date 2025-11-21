@@ -1,0 +1,136 @@
+name: Deploy CMA to Oracle C2M
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "*.cma"
+
+jobs:
+  deploy-cma:
+    runs-on: ubuntu-latest    # OR self-hosted for internal networks
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find CMA file
+        id: cma
+        run: |
+          file=$(ls *.cma | head -n 1)
+          if [ -z "$file" ]; then
+            echo "No CMA file found!"
+            exit 1
+          fi
+          echo "file=$file" >> $GITHUB_OUTPUT
+
+      #############################################
+      # 1. Validate the CMA before deploying
+      #############################################
+      - name: Validate CMA
+        id: validate
+        run: |
+          echo "Validating CMA..."
+
+          RESPONSE=$(curl -s -k -w "\n%{http_code}" -X POST \
+            -u "${C2M_USER}:${C2M_PASS}" \
+            -F "file=@${{ steps.cma.outputs.file }}" \
+            "${C2M_API_URL}/ouaf/migrationservice/validateCMA")
+
+          BODY=$(echo "$RESPONSE" | head -n 1)
+          STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "Validation response status: $STATUS"
+          echo "$BODY" > validation.json
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "CMA Validation failed!"
+            exit 1
+          fi
+
+          REQUEST_ID=$(echo "$BODY" | jq -r '.requestId')
+          echo "request_id=$REQUEST_ID" >> $GITHUB_OUTPUT
+
+      #############################################
+      # 2. Import CMA Package
+      #############################################
+      - name: Import CMA
+        id: import
+        run: |
+          echo "Importing CMA to C2M..."
+
+          RESPONSE=$(curl -s -k -w "\n%{http_code}" -X POST \
+            -u "${C2M_USER}:${C2M_PASS}" \
+            -F "file=@${{ steps.cma.outputs.file }}" \
+            -F "mode=MERGE" \
+            -F "comments=Deploy from GitHub Actions" \
+            "${C2M_API_URL}/ouaf/migrationservice/importCMA")
+
+          BODY=$(echo "$RESPONSE" | head -n 1)
+          STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "$BODY" > import.json
+          echo "Import HTTP status: $STATUS"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "CMA Import failed!"
+            exit 1
+          fi
+
+          REQUEST_ID=$(echo "$BODY" | jq -r '.requestId')
+          echo "request_id=$REQUEST_ID" >> $GITHUB_OUTPUT
+
+      #############################################
+      # 3. Poll for Completion
+      #############################################
+      - name: Poll Import Status
+        id: poll
+        run: |
+          echo "Polling status for request ${{ steps.import.outputs.request_id }}..."
+
+          REQUEST_ID="${{ steps.import.outputs.request_id }}"
+
+          for i in {1..30}; do
+            RESPONSE=$(curl -s -k -u "${C2M_USER}:${C2M_PASS}" \
+              "${C2M_API_URL}/ouaf/migrationservice/status/$REQUEST_ID")
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.status')
+            echo "Status: $STATUS"
+
+            if [ "$STATUS" = "COMPLETED" ]; then
+              echo "$RESPONSE" > status.json
+              exit 0
+            fi
+
+            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "ERROR" ]; then
+              echo "CMA Deployment FAILED!"
+              echo "$RESPONSE" > status.json
+              exit 1
+            fi
+
+            echo "Waiting 10 seconds..."
+            sleep 10
+          done
+
+          echo "Timed out waiting for CMA Import!"
+          exit 1
+
+      #############################################
+      # 4. Archive Logs
+      #############################################
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cma-deploy-logs
+          path: |
+            validation.json
+            import.json
+            status.json
+
+    env:
+      C2M_USER: ${{ secrets.C2M_USER }}
+      C2M_PASS: ${{ secrets.C2M_PASS }}
+      C2M_API_URL: ${{ secrets.C2M_API_URL }}
