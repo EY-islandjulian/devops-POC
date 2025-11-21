@@ -11,9 +11,11 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # 1️⃣ Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Locate CMA file
       - name: Locate CMA file
         id: cma
         shell: pwsh
@@ -25,6 +27,7 @@ jobs:
           }
           Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
 
+      # 3️⃣ Upload CMA via migrationImport API
       - name: Import CMA via REST API
         shell: pwsh
         env:
@@ -45,27 +48,24 @@ jobs:
           $encodedCreds = [Convert]::ToBase64String($bytes)
           $authHeader = "Basic $encodedCreds"
 
+          $uri = "$env:migration_import_api"  # No trailing slash
+          $filepath = "$env:cmafile"
+
+          # Prepare headers (Authorization only)
           $headers = @{
-              "accept" = "application/json"
               "Authorization" = $authHeader
-              "Content-Type" = "application/json"
           }
 
-          $body = @{
-              fileName = "$env:cmafile"
-          } | ConvertTo-Json
-
-          $uri = "$env:migration_import_api/"
-
-          # Invoke REST API, skip cert check for self-signed certificates
-          $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body -SkipCertificateCheck
+          # Upload CMA using multipart/form-data
+          $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Form @{ file = Get-Item $filepath } -SkipCertificateCheck
 
           $mdsId = $response.mdsId
           Write-Output "Imported CMA mdsId: $mdsId"
 
-          # Save response
+          # Save response as artifact
           $response | ConvertTo-Json | Out-File import_response.json
 
+      # 4️⃣ Upload import response artifact
       - name: Upload import response
         uses: actions/upload-artifact@v4
         with:
