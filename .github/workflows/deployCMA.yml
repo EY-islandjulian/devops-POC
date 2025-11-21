@@ -1,0 +1,66 @@
+name: Deploy CMA to Oracle C2M
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths: [ "*.cma" ]
+
+jobs:
+  deploy-cma:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Locate CMA file
+        id: cma
+        run: |
+          file=$(ls *.cma | head -n 1)
+          if [ -z "$file" ]; then
+            echo "No CMA file found!"
+            exit 1
+          fi
+          echo "file=$file" >> $GITHUB_OUTPUT
+
+      #############################################
+      # IMPORT CMA USING /migrationImport/
+      #############################################
+      - name: Import CMA into Oracle C2M
+        id: import
+        run: |
+          echo "Starting CMA import using migrationImport REST API..."
+
+          RESPONSE=$(curl -s -k -w "\n%{http_code}" \
+            -u "$C2M_USER:$C2M_PASS" \
+            -X POST \
+            -F "file=@${{ steps.cma.outputs.file }}" \
+            "${C2M_API_URL}/ouaf/rest/apis/cm/admin/migrationImport/")
+
+          BODY=$(echo "$RESPONSE" | head -n 1)
+          STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "$BODY" > import_response.json
+          echo "HTTP Status: $STATUS"
+
+          if [ "$STATUS" -ne 200 ] && [ "$STATUS" -ne 201 ]; then
+            echo "CMA import failed!"
+            exit 1
+          fi
+
+          echo "CMA import completed successfully."
+
+      #############################################
+      # Upload output for review
+      #############################################
+      - name: Upload Import Response
+        uses: actions/upload-artifact@v4
+        with:
+          name: cma-import-response
+          path: import_response.json
+
+    env:
+      C2M_USER: ${{ secrets.C2M_USER }}
+      C2M_PASS: ${{ secrets.C2M_PASS }}
+      C2M_API_URL: ${{ secrets.C2M_API_URL }}
