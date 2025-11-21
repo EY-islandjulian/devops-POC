@@ -1,102 +1,46 @@
-name: Deploy CMA to Oracle C2M
+name: CMA Migration
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
-    paths: [ "*.cma" ]
 
 jobs:
-  deploy-cma:
+  migrate:
     runs-on: self-hosted
-
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2️⃣ Locate CMA file
-      - name: Locate CMA file
+      - name: Generate CMA file
         id: cma
-        shell: pwsh
         run: |
-          $file = Get-ChildItem *.cma | Select-Object -First 1
-          if (-not $file) {
-            Write-Host "No CMA file found!"
-            exit 1
-          }
-          Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
+          # Example: generate CMA file
+          echo "cmafile=example.cma" >> $GITHUB_OUTPUT
 
-      # 3️⃣ Import CMA via HttpClient with error handling
-      - name: Import CMA via REST API
-        shell: pwsh
+      - name: Run Migration Script
         env:
-          username: SYSUSER
-          password: sysuser00
-          migration_import_api: https://10.1.9.133:6501/ouaf/rest/apis/cm/admin/migrationImport/
+          username: ${{ secrets.C2M_USER }}
+          password: ${{ secrets.C2M_PASS }}
+          migration_import_api: ${{ secrets.C2M_API_URL }}
           cmafile: ${{ steps.cma.outputs.cmafile }}
         run: |
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          Write-Host "Uploading CMA file $env:cmafile to $env:migration_import_api"
+          pwsh -Command "
+            Write-Host ""Username: $env:username""
+            Write-Host ""API URL: $env:migration_import_api""
 
-          # Encode Basic Auth
-          $pair = "$env:username`:$env:password"
-          $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
-          $encodedCreds = [Convert]::ToBase64String($bytes)
-          $authHeader = "Basic $encodedCreds"
+            $pair = ""$env:username`:$env:password""
+            $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
+            $encodedCreds = [Convert]::ToBase64String($bytes)
+            $authHeader = ""Basic $encodedCreds""
 
-          # Load HttpClient
-          Add-Type -AssemblyName System.Net.Http
-          $handler = [System.Net.Http.HttpClientHandler]::new()
-          $handler.ServerCertificateCustomValidationCallback = { $true } # skip self-signed cert
-          $client = [System.Net.Http.HttpClient]::new($handler)
+            $headers = @{
+                'accept' = 'application/json'
+                'Authorization' = $authHeader
+                'Content-Type' = 'application/json'
+            }
 
-          # Set Authorization and User-Agent headers
-          $client.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::Parse($authHeader)
-          $client.DefaultRequestHeaders.Add("User-Agent","GitHubRunner/1.0")
+            $body = @{ fileName = $env:cmafile } | ConvertTo-Json
+            $uri = ""$env:migration_import_api/""
 
-          # Prepare multipart/form-data content
-          $multipartContent = [System.Net.Http.MultipartFormDataContent]::new()
-          $fileStream = [System.IO.File]::OpenRead($env:cmafile)
-          $fileContent = [System.Net.Http.StreamContent]::new($fileStream)
-          $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/octet-stream")
-          $multipartContent.Add($fileContent, "file", [System.IO.Path]::GetFileName($env:cmafile))
-
-          try {
-              # Send POST request
-              Write-Host "Sending POST request..."
-              $response = $client.PostAsync($env:migration_import_api, $multipartContent).Result
-
-              if (-not $response) { throw "No response from server" }
-              Write-Host "HTTP Status Code: $($response.StatusCode.value__)"
-
-              $responseBody = $response.Content.ReadAsStringAsync().Result
-              Write-Host "Response from C2M API:"
-              Write-Output $responseBody
-
-              # Parse mdsId if present
-              try {
-                  $json = $responseBody | ConvertFrom-Json
-                  if ($json.mdsId) { Write-Output "Imported CMA mdsId: $($json.mdsId)" }
-                  else { Write-Host "mdsId not found in response." }
-              } catch { Write-Host "Response is not JSON." }
-
-              # Save response as artifact
-              $responseBody | Out-File import_response.json
-          }
-          catch {
-              Write-Host "Error calling migrationImport API: $_"
-              exit 1
-          }
-          finally {
-              # Cleanup
-              $fileStream.Close()
-              $client.Dispose()
-          }
-
-      # 4️⃣ Upload import response artifact
-      - name: Upload import response
-        uses: actions/upload-artifact@v4
-        with:
-          name: cma-import-response
-          path: import_response.json
+            $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body -SkipCertificateCheck
+            Write-Output $response.mdsId
+          "
