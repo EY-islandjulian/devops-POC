@@ -33,7 +33,7 @@ jobs:
         env:
           username: SYSUSER
           password: sysuser00
-          migration_import_api: https://10.1.9.133:6501/ouaf/rest/apis/cm/admin/migrationImport
+          migration_import_api: https://10.1.9.133:6501/ouaf/rest/apis/cm/admin/migrationImport/
           cmafile: ${{ steps.cma.outputs.cmafile }}
         run: |
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
