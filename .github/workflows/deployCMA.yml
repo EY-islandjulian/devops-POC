@@ -16,51 +16,59 @@ jobs:
 
       - name: Locate CMA file
         id: cma
+        shell: pwsh
         run: |
-          file=$(ls *.cma | head -n 1)
-          if [ -z "$file" ]; then
-            echo "No CMA file found!"
+          $file = Get-ChildItem *.cma | Select-Object -First 1
+          if (-not $file) {
+            Write-Host "No CMA file found!"
             exit 1
-          fi
-          echo "file=$file" >> $GITHUB_OUTPUT
+          }
+          Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
 
-      #############################################
-      # IMPORT CMA USING /migrationImport/
-      #############################################
-      - name: Import CMA into Oracle C2M
-        id: import
+      - name: Import CMA via REST API
+        shell: pwsh
+        env:
+          username: ${{ secrets.C2M_USER }}
+          password: ${{ secrets.C2M_PASS }}
+          migration_import_api: ${{ secrets.C2M_API_URL }}
+          cmafile: ${{ steps.cma.outputs.cmafile }}
         run: |
-          echo "Starting CMA import using migrationImport REST API..."
+          # Force TLS 1.2
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-          RESPONSE=$(curl -s -k -w "\n%{http_code}" \
-            -u "$C2M_USER:$C2M_PASS" \
-            -X POST \
-            -F "file=@${{ steps.cma.outputs.file }}" \
-            "${C2M_API_URL}/ouaf/rest/apis/cm/admin/migrationImport/")
+          Write-Host "Username: $env:username"
+          Write-Host "Migration API: $env:migration_import_api"
+          Write-Host "CMA File: $env:cmafile"
 
-          BODY=$(echo "$RESPONSE" | head -n 1)
-          STATUS=$(echo "$RESPONSE" | tail -n 1)
+          # Encode Basic Auth
+          $pair = "$env:username`:$env:password"
+          $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
+          $encodedCreds = [Convert]::ToBase64String($bytes)
+          $authHeader = "Basic $encodedCreds"
 
-          echo "$BODY" > import_response.json
-          echo "HTTP Status: $STATUS"
+          $headers = @{
+              "accept" = "application/json"
+              "Authorization" = $authHeader
+              "Content-Type" = "application/json"
+          }
 
-          if [ "$STATUS" -ne 200 ] && [ "$STATUS" -ne 201 ]; then
-            echo "CMA import failed!"
-            exit 1
-          fi
+          $body = @{
+              fileName = "$env:cmafile"
+          } | ConvertTo-Json
 
-          echo "CMA import completed successfully."
+          $uri = "$env:migration_import_api/"
 
-      #############################################
-      # Upload output for review
-      #############################################
+          # Invoke REST method (skip cert check for self-signed certs)
+          $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Body $body -SkipCertificateCheck
+
+          $mdsId = $response.mdsId
+          Write-Output "Imported CMA mdsId: $mdsId"
+
+          # Save response as artifact
+          $response | ConvertTo-Json | Out-File import_response.json
+
       - name: Upload Import Response
         uses: actions/upload-artifact@v4
         with:
           name: cma-import-response
           path: import_response.json
-
-    env:
-      C2M_USER: ${{ secrets.C2M_USER }}
-      C2M_PASS: ${{ secrets.C2M_PASS }}
-      C2M_API_URL: ${{ secrets.C2M_API_URL }}
