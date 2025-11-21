@@ -10,11 +10,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Generate CMA file
+      - name: Locate CMA file
         id: cma
+        shell: pwsh
         run: |
-          # Example: generate CMA file
-          echo "cmafile=example.cma" >> $GITHUB_OUTPUT
+          $file = Get-ChildItem *.cma | Select-Object -First 1
+          if (-not $file) {
+            Write-Host "No CMA file found!"
+            exit 1
+          }
+          Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
 
       - name: Run Migration Script
         env:
