@@ -27,7 +27,7 @@ jobs:
           }
           Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
 
-      # 3️⃣ Import CMA via HttpClient with error handling
+      # 3️⃣ Import CMA via REST API (robust PowerShell)
       - name: Import CMA via REST API
         shell: pwsh
         env:
@@ -36,26 +36,40 @@ jobs:
           migration_import_api: ${{ secrets.C2M_API_URL }}
           cmafile: ${{ steps.cma.outputs.cmafile }}
         run: |
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
           Write-Host "Uploading CMA file $env:cmafile to $env:migration_import_api"
+
+          # Force TLS 1.2
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          # Trust all SSL certificates (self-signed)
+          Add-Type @"
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+public class TrustAllCertsPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(
+        ServicePoint srvPoint, X509Certificate certificate,
+        WebRequest request, int certificateProblem) {
+        return true;
+    }
+}
+"@
+          [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
           # Encode Basic Auth
           $pair = "$env:username`:$env:password"
-          $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
-          $encodedCreds = [Convert]::ToBase64String($bytes)
+          $encodedCreds = [Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($pair))
           $authHeader = "Basic $encodedCreds"
 
-          # Load HttpClient
+          # Create HttpClient
           Add-Type -AssemblyName System.Net.Http
           $handler = [System.Net.Http.HttpClientHandler]::new()
-          $handler.ServerCertificateCustomValidationCallback = { $true } # skip self-signed cert
+          $handler.ServerCertificateCustomValidationCallback = { $true }
           $client = [System.Net.Http.HttpClient]::new($handler)
 
-          # Set Authorization and User-Agent headers
           $client.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::Parse($authHeader)
-          $client.DefaultRequestHeaders.Add("User-Agent","GitHubRunner/1.0")
+          $client.DefaultRequestHeaders.UserAgent.ParseAdd("GitHubRunner-C2M-Deploy-1.0")
 
-          # Prepare multipart/form-data content
+          # Prepare multipart/form-data
           $multipartContent = [System.Net.Http.MultipartFormDataContent]::new()
           $fileStream = [System.IO.File]::OpenRead($env:cmafile)
           $fileContent = [System.Net.Http.StreamContent]::new($fileStream)
@@ -63,33 +77,31 @@ jobs:
           $multipartContent.Add($fileContent, "file", [System.IO.Path]::GetFileName($env:cmafile))
 
           try {
-              # Send POST request
               Write-Host "Sending POST request..."
               $response = $client.PostAsync($env:migration_import_api, $multipartContent).Result
 
-              if (-not $response) { throw "No response from server" }
-              Write-Host "HTTP Status Code: $($response.StatusCode.value__)"
+              if (-not $response) { throw "No response from server (HttpClient returned null)" }
 
+              Write-Host "HTTP Status Code: $($response.StatusCode.value__)"
               $responseBody = $response.Content.ReadAsStringAsync().Result
-              Write-Host "Response from C2M API:"
+              Write-Host "Response body:"
               Write-Output $responseBody
 
               # Parse mdsId if present
               try {
                   $json = $responseBody | ConvertFrom-Json
-                  if ($json.mdsId) { Write-Output "Imported CMA mdsId: $($json.mdsId)" }
+                  if ($json.mdsId) { Write-Host "Imported CMA mdsId: $($json.mdsId)" }
                   else { Write-Host "mdsId not found in response." }
-              } catch { Write-Host "Response is not JSON." }
+              } catch { Write-Host "Response is not JSON or mdsId missing." }
 
-              # Save response as artifact
+              # Save response for artifact upload
               $responseBody | Out-File import_response.json
           }
           catch {
-              Write-Host "Error calling migrationImport API: $_"
+              Write-Host "POST request failed: $_"
               exit 1
           }
           finally {
-              # Cleanup
               $fileStream.Close()
               $client.Dispose()
           }
