@@ -27,7 +27,7 @@ jobs:
           }
           Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
 
-      # 3️⃣ Import CMA via curl
+      # 3️⃣ Import CMA via HttpClient (PowerShell)
       - name: Import CMA via REST API
         shell: pwsh
         env:
@@ -36,17 +36,55 @@ jobs:
           migration_import_api: ${{ secrets.C2M_API_URL }}
           cmafile: ${{ steps.cma.outputs.cmafile }}
         run: |
-          $uri = "$env:migration_import_api"      # No trailing slash
-          $filepath = "$env:cmafile"
-          $user = $env:username
-          $pass = $env:password
+          Write-Host "Uploading CMA file $env:cmafile to $env:migration_import_api"
 
-          Write-Host "Uploading CMA file $filepath to $uri"
+          # Force TLS 1.2
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-          # Use curl with proper multipart/form-data
-          curl.exe -k -u "$user`:$pass" -X POST -F "file=@$filepath" $uri -o import_response.json
+          # Encode Basic Auth
+          $pair = "$env:username`:$env:password"
+          $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
+          $encodedCreds = [Convert]::ToBase64String($bytes)
+          $authHeader = "Basic $encodedCreds"
 
-          Write-Host "CMA import response saved to import_response.json"
+          # Load HttpClient
+          Add-Type -AssemblyName System.Net.Http
+          $handler = [System.Net.Http.HttpClientHandler]::new()
+          # Skip self-signed cert validation
+          $handler.ServerCertificateCustomValidationCallback = { $true }
+          $client = [System.Net.Http.HttpClient]::new($handler)
+
+          # Set Authorization header
+          $client.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::Parse($authHeader)
+
+          # Prepare multipart/form-data content
+          $multipartContent = [System.Net.Http.MultipartFormDataContent]::new()
+          $fileStream = [System.IO.File]::OpenRead($env:cmafile)
+          $fileContent = [System.Net.Http.StreamContent]::new($fileStream)
+          $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("application/octet-stream")
+          $multipartContent.Add($fileContent, "file", [System.IO.Path]::GetFileName($env:cmafile))
+
+          # Send POST request
+          $response = $client.PostAsync($env:migration_import_api, $multipartContent).Result
+          $responseBody = $response.Content.ReadAsStringAsync().Result
+
+          Write-Host "Response from C2M API:"
+          Write-Output $responseBody
+
+          # Parse mdsId if present
+          try {
+              $json = $responseBody | ConvertFrom-Json
+              if ($json.mdsId) { Write-Output "Imported CMA mdsId: $($json.mdsId)" }
+          } catch {
+              Write-Host "Response is not JSON or mdsId missing."
+          }
+
+          # Save response as artifact
+          $responseBody | Out-File import_response.json
+
+          # Cleanup
+          $fileStream.Close()
+          $client.Dispose()
 
       # 4️⃣ Upload import response artifact
       - name: Upload import response
