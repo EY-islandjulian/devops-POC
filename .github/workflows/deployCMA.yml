@@ -2,9 +2,11 @@ name: Deploy CMA to Oracle C2M
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
-    paths: [ "*.cma" ]
+    inputs:
+      cmafile:
+        description: 'CMA file to deploy (must exist in repo root)'
+        required: true
+        default: 'EXT-0010.CodeConfig.cma'
 
 jobs:
   deploy-cma:
@@ -15,17 +17,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Locate CMA file
-      - name: Locate CMA file
+      # 2️⃣ Locate CMA file (from workflow input)
+      - name: Use CMA file from input
         id: cma
         shell: pwsh
         run: |
-          $file = Get-ChildItem *.cma | Select-Object -First 1
-          if (-not $file) {
-            Write-Host "No CMA file found!"
+          $fileName = "${{ github.event.inputs.cmafile }}"
+          if (-not (Test-Path $fileName)) {
+            Write-Host "CMA file '$fileName' not found in repository!"
             exit 1
           }
-          Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
+          Write-Host "Using CMA file: $fileName"
+          Write-Output "cmafile=$fileName" >> $env:GITHUB_OUTPUT
 
       # 3️⃣ Import CMA via REST API (robust PowerShell)
       - name: Import CMA via REST API
