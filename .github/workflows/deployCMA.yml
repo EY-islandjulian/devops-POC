@@ -38,7 +38,7 @@ jobs:
           RESPONSE=$(curl -s -k -w "\n%{http_code}" -X POST \
             -u "${C2M_USER}:${C2M_PASS}" \
             -F "file=@${{ steps.cma.outputs.file }}" \
-            "${C2M_API_URL}/ouaf/migrationservice/validateCMA")
+            "${C2M_API_URL}/ouaf/rest/apis/cm/admin/migrationImport")
 
           BODY=$(echo "$RESPONSE" | head -n 1)
           STATUS=$(echo "$RESPONSE" | tail -n 1)
@@ -67,7 +67,7 @@ jobs:
             -F "file=@${{ steps.cma.outputs.file }}" \
             -F "mode=MERGE" \
             -F "comments=Deploy from GitHub Actions" \
-            "${C2M_API_URL}/ouaf/migrationservice/importCMA")
+            "${C2M_API_URL}/ouaf/rest/apis/cm/admin/migrationImport")
 
           BODY=$(echo "$RESPONSE" | head -n 1)
           STATUS=$(echo "$RESPONSE" | tail -n 1)
@@ -95,7 +95,7 @@ jobs:
 
           for i in {1..30}; do
             RESPONSE=$(curl -s -k -u "${C2M_USER}:${C2M_PASS}" \
-              "${C2M_API_URL}/ouaf/migrationservice/status/$REQUEST_ID")
+              "${C2M_API_URL}/ouaf/rest/apis/cm/admin/migrationImport/status/$REQUEST_ID")
 
             STATUS=$(echo "$RESPONSE" | jq -r '.status')
             echo "Status: $STATUS"
