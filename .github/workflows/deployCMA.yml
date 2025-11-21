@@ -11,7 +11,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # 1️⃣ Checkout the repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -27,7 +27,7 @@ jobs:
           }
           Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
 
-      # 3️⃣ Upload CMA via migrationImport API
+      # 3️⃣ Import CMA via curl
       - name: Import CMA via REST API
         shell: pwsh
         env:
@@ -36,34 +36,17 @@ jobs:
           migration_import_api: ${{ secrets.C2M_API_URL }}
           cmafile: ${{ steps.cma.outputs.cmafile }}
         run: |
-          # Force TLS 1.2
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-          Write-Host "CMA File: $env:cmafile"
-          Write-Host "Migration API: $env:migration_import_api"
-
-          # Encode Basic Auth
-          $pair = "$env:username`:$env:password"
-          $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
-          $encodedCreds = [Convert]::ToBase64String($bytes)
-          $authHeader = "Basic $encodedCreds"
-
-          $uri = "$env:migration_import_api"  # No trailing slash
+          $uri = "$env:migration_import_api"      # No trailing slash
           $filepath = "$env:cmafile"
+          $user = $env:username
+          $pass = $env:password
 
-          # Prepare headers (Authorization only)
-          $headers = @{
-              "Authorization" = $authHeader
-          }
+          Write-Host "Uploading CMA file $filepath to $uri"
 
-          # Upload CMA using multipart/form-data
-          $response = Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -Form @{ file = Get-Item $filepath } -SkipCertificateCheck
+          # Use curl with proper multipart/form-data
+          curl.exe -k -u "$user`:$pass" -X POST -F "file=@$filepath" $uri -o import_response.json
 
-          $mdsId = $response.mdsId
-          Write-Output "Imported CMA mdsId: $mdsId"
-
-          # Save response as artifact
-          $response | ConvertTo-Json | Out-File import_response.json
+          Write-Host "CMA import response saved to import_response.json"
 
       # 4️⃣ Upload import response artifact
       - name: Upload import response
