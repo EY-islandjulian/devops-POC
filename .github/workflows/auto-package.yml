@@ -26,4 +26,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zipped-folder
-          path: devops-POC/  # Specify the path of the resulting zip file
+          path: H2OA_CM065.001.zip # Specify the path of the resulting zip file
