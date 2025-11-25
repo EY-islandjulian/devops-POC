@@ -28,6 +28,21 @@ jobs:
       - name: Install zip (if necessary)
         run: sudo apt-get install -y zip  # Install zip if it's not already available
 
+      - name: Verify folder existence before zipping
+        run: |
+          # Print out the contents of the repository to verify the folder's existence
+          echo "Listing contents of the repo before zipping:"
+          ls -l
+          
+          # Check if the folder you want to zip exists
+          folder_name="${{ env.RELEASE_TITLE }}"
+          if [ ! -d "$folder_name" ]; then
+            echo "Folder $folder_name does not exist!"
+            exit 1
+          else
+            echo "Folder $folder_name exists. Proceeding with zip."
+          fi
+
       - name: Zip contents of a folder
         id: zip-folder
         run: |
@@ -37,9 +52,9 @@ jobs:
           
           # Zip the folder (replace with your actual folder if it exists)
           zip -r "$folder_name.zip" "$folder_name"  # Zip the folder
-          
-          # List the directory contents to confirm that the .zip file is created
-          echo "Listing files in the current directory:"
+
+          # List the directory contents after zipping to confirm the .zip file is created
+          echo "Listing files after zipping:"
           ls -l  # This will list all files in the current directory
 
       - name: Set up Git for pushing
@@ -57,8 +72,8 @@ jobs:
           echo "Listing files before git add:"
           ls -l  # This will show the file paths in the working directory
 
-          # Add the zip file generated from the folder_name
-          git add "$folder_name.zip"  # Use folder_name.zip as the file name
+          # Add the zip file generated from the folder_name (exact filename)
+          git add "$folder_name.zip"  # Ensure we're referencing the correct filename
           git commit -m "Add zip file $folder_name.zip" || echo "No changes to commit"  # Commit if there's a change
           git push origin develop  # Push the changes to the remote 'develop' branch
         env:
