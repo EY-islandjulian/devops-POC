@@ -31,6 +31,6 @@ jobs:
         run: |
           git add H2OA_CM065.001.zip  # Add the zip file to staging
           git commit -m "Add zip file H2OA_CM065.001.zip"  # Commit the zip file
-          git push origin devops-POC  # Push the commit to the devops-POC branch
+          git push origin develop  # Push the commit to the devops-POC branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for authentication
