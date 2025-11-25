@@ -149,8 +149,13 @@ jobs:
           # Define the destination path on the self-hosted runner
           $destination_dir = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
 
-          # Ensure the destination directory exists
-          mkdir -p $destination_dir
+          # Check if the destination directory exists, and create it if it doesn't
+          if (-not (Test-Path $destination_dir)) {
+            Write-Host "Directory does not exist. Creating: $destination_dir"
+            New-Item -ItemType Directory -Path $destination_dir
+          } else {
+            Write-Host "Directory already exists: $destination_dir"
+          }
 
           # Debugging the source file path
           Write-Host "Source file: $source_file"
