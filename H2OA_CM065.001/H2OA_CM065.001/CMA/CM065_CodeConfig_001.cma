@@ -1,0 +1,195 @@
+05UTF-801516CM065_CodeConfig28CM065 - Send Account Balance100https://us-phoenix-1.stg.utilities-cloud.oracleindustry.com/c5s849/test/ccs/web/usermap?language=ENG2025-10-21-04.23.22010021216CI_SCR_CRT_GRP_L0312601706SCR_CD01N0001215SCR_CRT_GRP_NBR11N03N11LANGUAGE_CD01N0000307VERSION11N05Y05DESCR05N0006008DESCR25405N0025409OWNER_FLG04N414CI_SCR_PRMPT_L0312501712STEP_SEQ_NUM11N05N06SCR_CD01N0001207SEQ_NUM11N03Y11LANGUAGE_CD01N0000307VERSION11N05Y10LABEL_LONG05N0006009OWNER_FLG04N413CI_SCR_STEP_L0312401712STEP_SEQ_NUM11N05N06SCR_CD01N0001211LANGUAGE_CD01N0000307VERSION11N05Y11TEXT_VAR_SW02N08SCR_TEXT05N0200009OWNER_FLG04N406CI_SCR03197021006SCR_CD01N0001216SCR_ELIG_OPT_FLG04N407VERSION11N05Y17SCR_INVOC_OPT_FLG04N412SCR_TYPE_FLG04N414ALG_ENTITY_FLG04N410APP_SVC_ID01N0002009OWNER_FLG04N410BUS_OBJ_CD01N0003018SCR_ENGINE_VER_FLG04N409CI_SCR_DA0312501706SCR_CD01N0001207DA_NAME05N0003011DA_TYPE_FLG04N411SCHEMA_NAME01N0003015SCHEMA_TYPE_FLG04N407VERSION11N05Y09OWNER_FLG04N410CI_SCR_CRT03335021606SCR_CD01N0001215SCR_CRT_GRP_NBR11N03N07SEQ_NUM11N03Y07VERSION11N05Y09SORT_SEQ511N05Y18SCCRT_FLD_TYPE_FLG04N418SCCRT_CHAR_ENT_FLG04N412CHAR_TYPE_CD01N0000815CRT_COMP_ALG_CD01N0001214CRT_FLD_ALG_CD01N0001211CRT_OPR_FLG04N418CRT_TRUE_INSTR_FLG04N418CRT_FALS_INSTR_FLG04N418CRT_INSF_INSTR_FLG04N412CRT_COMP_VAL05N0025409OWNER_FLG04N412CI_SCR_PRMPT0313601806SCR_CD01N0001212STEP_SEQ_NUM11N05N07SEQ_NUM11N03Y08SORT_SEQ11N02Y13NEXT_SORT_SEQ11N05Y10DEFAULT_SW02N07VERSION11N05Y09OWNER_FLG04N414CI_SCR_FLD_MAP03198021006SCR_CD01N0001212STEP_SEQ_NUM11N05N07FUNC_CD01N0001213FUNC_FLD_NAME01N0002007VERSION11N05Y17DEST_FLD_TYPE_FLG04N416SRC_FLD_TYPE_FLG04N411MAP_FLD_VAL05N0010012MAP_FLD_NAME05N0010009OWNER_FLG04N414CI_SCR_CRT_GRP0313701706SCR_CD01N0001215SCR_CRT_GRP_NBR11N03N07VERSION11N05Y09SORT_SEQ511N05Y18GRP_TRUE_INSTR_FLG04N418GRP_FALS_INSTR_FLG04N409OWNER_FLG04N408CI_SCR_L0310701606SCR_CD01N0001211LANGUAGE_CD01N0000307VERSION11N05Y08DESCR25405N0025409OWNER_FLG04N409DESCR400005Y0400011CI_SCR_STEP03751023711BUTTON_NAME05N0005014CRT_A_FLD_NAME05N0010018CRT_A_FLD_TYPE_FLG04N414CRT_B_FLD_NAME05N0010018CRT_B_FLD_TYPE_FLG04N413CRT_B_FLD_VAL05N0010013DEST_FLD_NAME05N0010017DEST_FLD_TYPE_FLG04N410DISPLAY_SW02N12DISP_ICON_CD01N0001214FALSE_SORT_SEQ11N05N07FUNC_CD01N0001211IF_TYPE_FLG04N412MATH_OPR_FLG04N410NAV_OPT_CD01N0003213NEXT_SORT_SEQ11N05Y15PROMPT_TYPE_FLG04N406SCR_CD01N0001209SORT_SEQ511N05Y12SRC_FLD_NAME05N0010016SRC_FLD_TYPE_FLG04N411SRC_FLD_VAL05N0010013STEP_TYPE_FLG04N410SUB_SCR_CD01N0001206HEIGHT05N0000513TRUE_SORT_SEQ11N05N15HEIGHT_TYPE_FLG04N407VERSION11N05Y11SCHEMA_NAME01N0003015SCHEMA_TYPE_FLG04N413TERMINATE_FLG04N413BO_ACTION_FLG04N414EDIT_DATA_AREA06N15TARGET_AREA_FLG04N409OWNER_FLG04N412STEP_SEQ_NUM11N05N17SCR_STEP_WARN_FLG04N409F1_SCHEMA029101511SCHEMA_NAME01N0003015SCHEMA_TYPE_FLG04N407VERSION11N05Y11SCHEMA_DEFN06N09OWNER_FLG04N401113F1-ScriptOnly06SCRIPT01012CM_GetCurBal01106SCRIPT01012CM_GetCurBal19F1-ScriptPhysicalBO01005109811206CI_SCR0110012CM_GetCurBalSENE0284    SVSC    0008F1-DFLTSCM  0000F13014CI_SCR_CRT_GRP01010CI_SCR_CRT01016CI_SCR_CRT_GRP_L01009CI_SCR_DA0140012CM_GetCurBal00026C1-GetFeatureConfigurationSCHM0026C1-GetFeatureConfigurationF1BS013CM  0012CM_GetCurBal00009F1-LookupSCHM0009F1-LookupF1BO013CM  0012CM_GetCurBal00012F1-RETFCONFGSCHM0012F1-RETFCONFGF1BS013CM  0012CM_GetCurBal00004parmSCSM0012CM_GetCurBalF1SC011CM  08CI_SCR_L0110012CM_GetCurBal0003ENG01100027Get Current Account BalanceCM  0000011CI_SCR_STEP0160000000000    00000    0000000000    N00000100000        0000010    0012CM_GetCurBal021000000    00000LABL000000000010    0180000            010    CM  011    0000000000    00000    0000000000    N00000100000        0000010    0012CM_GetCurBal022000000    00000GVIM000000000010    0160000            03899import com.splwg.base.domain.todo.toDoType.ToDoType;
+import com.splwg.base.domain.todo.toDoType.ToDoType_Id;
+import com.splwg.base.api.datatypes.Money
+import com.splwg.ccb.domain.customerinfo.account.entity.Account
+import com.splwg.ccb.domain.customerinfo.account.entity.Account_Id
+import com.splwg.base.api.businessService.BusinessServiceInstance
+import com.splwg.base.api.businessObject.COTSInstanceNode
+import com.splwg.shared.common.ApplicationError
+import com.splwg.base.api.businessObject.COTSInstanceListNode
+import com.splwg.base.domain.common.currency.Currency_Id
+import com.splwg.ccb.domain.customerinfo.person.entity.Person
+import com.splwg.base.api.businessObject.COTSInstanceList
+import java.lang.Object
+import com.splwg.base.api.businessService.BusinessServiceDispatcher
+import com.splwg.base.api.lookup.MessageSeverityLookup
+import com.splwg.base.api.lookup.BusinessObjectActionLookup    CM  012    0000000000    00000    0000000000    N00000100000        0000010    0012CM_GetCurBal023000000    00000GVYM000000000010    02100000            041244// Constants
+private static final String FEATURE_TYPE = "ICFO";
+private static final String DESCR_DRTD = "Data Refresh To Do Type";
+
+private static final String OPTION_TYPE_WSES = "WSES";
+private static final String OPTION_TYPE_WSRL = "WSRL";
+private static final String OPTION_TYPE_DRTD = "DRTD";
+private static final String EMAIL_SUBJECT_TEXT = "Get Current Account Balance Web Service Error";
+private static final String EMAIL_EMAIL_SENDER = "CM-EMAILSEND";
+
+private static final int MESSAGE_CATEGORY = 90005;
+   
+public static final int NO_FEATURE_CONFIGURATION_FOUND	= 10101;
+public static final int FEATURE_CONFIGURATION_OPTION_TYPE_MISSING = 10103; 
+public static final int FEATURE_CONFIGURATION_OPTION_TYPE_INVALID = 10105; 
+public static final int ACCOUNT_ID_INVALID = 10106;
+
+// Groovy Library Scripts
+private CM_ToDoUtil toDoUtil = createLibraryScript(CM_ToDoUtil.class);
+private CM_StrUtil strUtil = createLibraryScript(CM_StrUtil.class);
+private CM_MailUtil mailUtil = createLibraryScript(CM_MailUtil.class);
+
+// Work Variables
+private String accountString;
+
+private Currency_Id currencyId;
+private String personIdString;
+private String entityName;
+private Money currentAmount;
+private Money totalAmount;
+private ToDoType toDoType;    CM  013    0000000000    00000    0000000000    N00000100000        0000010    0012CM_GetCurBal024000000    00000GVYM000000000010    02310000            043292public void invoke(){
+
+    try{
+        if(getFieldValues()) {				
+            move 'OK', "parm/output/status";
+            move 'Transaction successful.', "parm/output/statusMsg";		
+        }
+    }
+    catch(ApplicationError e){
+        String message = e.getServerMessage().getMessageText();
+        move 'F', "parm/output/status";
+        move message, "parm/output/statusMsg";		
+
+        // Create To Do Entry when To Do Type is not null.
+        if(!isNull(toDoType)){          
+            ArrayList<String> messageParameters = new ArrayList<String>();
+
+            List<Object> messageParms = e.getServerMessage().getMessageParameters().getParameters();
+            for(Object messageParm : messageParms){
+                messageParameters.add(messageParm.toString());
+            }
+
+            toDoUtil.createToDoEntry(toDoType.getId(), null, Long.valueOf(MESSAGE_CATEGORY), e.getServerMessage().getNumber().longValue(), messageParameters, null, null, null, null, null, getProcessDateTime()); 
+        }
+
+        // Create body of the email
+        String stackTrace = "";
+        for(StackTraceElement ste: e.getStackTrace()){
+            stackTrace = stackTrace + ste.toString().trim() + "\n";
+        }
+        
+        StringBuilder emailBuilder = new StringBuilder();
+        emailBuilder.append("<html>");
+        emailBuilder.append("<body style=\"font-family: 'Arial', monospace; font-size: 14px;\">");
+        emailBuilder.append("<p>An error was encountered in the webservice: <u>").append(message).append("</u></p>");
+        emailBuilder.append("<p>Stack trace: ").append(stackTrace).append("</p>");
+        emailBuilder.append("</body>");
+        emailBuilder.append("</html>");
+      	
+        // Get Sender Email Address from the Feature Configuration
+        move FEATURE_TYPE, "C1-GetFeatureConfiguration/featureType";
+        move OPTION_TYPE_WSES, "C1-GetFeatureConfiguration/optionType"; 
+        invokeBS 'C1-GetFeatureConfiguration', "C1-GetFeatureConfiguration";
+
+        String fromAddress = "";
+        if(evalBoolean("count(C1-GetFeatureConfiguration/options) > 0")){
+            fromAddress = evalString("C1-GetFeatureConfiguration/options[1]/optionValue");
+        }
+      
+        // Get Email Reciepients from the Feature Configuration
+        move FEATURE_TYPE, "C1-GetFeatureConfiguration/featureType";
+        move OPTION_TYPE_WSRL, "C1-GetFeatureConfiguration/optionType"; 
+        invokeBS 'C1-GetFeatureConfiguration', "C1-GetFeatureConfiguration";
+
+        ArrayList<String> toAddresses = new ArrayList<String>();
+      	List<org.w3c.dom.Element> addressList = evalList("C1-GetFeatureConfiguration/options");
+        for (org.w3c.dom.Element currentAddress in addressList) {
+            setElementScriptVariable('address', currentAddress);    
+          	toAddresses.add(evalString('$address/optionValue'));
+        }   
+
+        // Set the email sender
+        ArrayList<String> emailSenders = new ArrayList<String>();
+        emailSenders.add(EMAIL_EMAIL_SENDER);
+
+        // Send the email when Sender and Recipients are populated.
+        if(strUtil.notEmptyOrBlank(fromAddress) && toAddresses.size() > 0){
+            mailUtil.sendEmail(fromAddress, toAddresses, EMAIL_SUBJECT_TEXT, emailBuilder.toString(), emailSenders);
+        }
+
+    }
+}    CM  014    0000000000    00000    0000000000    N00000100000        0000010    0012CM_GetCurBal025000000    00000GVYM000000000010    0160000            042674/**
+* Retrieves the input from the schema and sets the output for the response.
+* @return true if no error encountered
+*/
+private boolean getFieldValues(){
+
+    Date referenceDate = getProcessDateTime().getDate();
+    accountString = evalString("parm/input/accountId");
+
+    // Validate if Feature Configuration is present.
+    move FEATURE_TYPE, "F1-RETFCONFG/featureType";
+    invokeBS 'F1-RETFCONFG', "F1-RETFCONFG";
+    if(evalInteger("F1-RETFCONFG/rowCount") == 0){
+        addError(MESSAGE_CATEGORY, NO_FEATURE_CONFIGURATION_FOUND, FEATURE_TYPE);
+    }
+    String featureConfigName = evalString("F1-RETFCONFG/results[1]/featureConfigurationName");
+
+    // Validate if To Do Type is configured in the Feature Configuration.
+    move FEATURE_TYPE, "C1-GetFeatureConfiguration/featureType";
+    move OPTION_TYPE_DRTD, "C1-GetFeatureConfiguration/optionType"; 
+    invokeBS 'C1-GetFeatureConfiguration', "C1-GetFeatureConfiguration";
+
+    if(evalBoolean("count(C1-GetFeatureConfiguration/options) = 0")){
+        addError(MESSAGE_CATEGORY, FEATURE_CONFIGURATION_OPTION_TYPE_MISSING, featureConfigName, " ", DESCR_DRTD);
+    }
+
+    // Validate if the retrieved To Do Type from the Feature Configuration is a valid entity.
+    String toDoTypeString = evalString("C1-GetFeatureConfiguration/options[1]/optionValue");
+    toDoType = new ToDoType_Id(toDoTypeString).getEntity();
+    if(isNull(toDoType)){
+        addError(MESSAGE_CATEGORY, FEATURE_CONFIGURATION_OPTION_TYPE_INVALID, featureConfigName, DESCR_DRTD, " ", toDoTypeString, "To Do Type");
+    }
+
+    // Validate if the account string from the request is a valid account.
+    Account account = new Account_Id(accountString).getEntity();
+    if(isNull(account)){
+        addError(MESSAGE_CATEGORY, ACCOUNT_ID_INVALID, accountString, MessageSeverityLookup.constants.SEVERE);
+    }
+
+    Person mainPerson = account.getMainPerson().getId().getEntity();
+    personIdString = mainPerson.getId().getTrimmedValue();
+    entityName = mainPerson.getPersonPrimaryName();
+    currentAmount = account.getFinancialBalances(referenceDate, referenceDate).getCurrentAmount();
+
+    if(isNull(currentAmount)){
+        currentAmount = Money.ZERO;
+    }
+
+    totalAmount = account.getFinancialBalances(referenceDate, referenceDate).getTotalAmount();
+    if(isNull(totalAmount)) {
+        totalAmount = Money.ZERO;
+    }	
+
+    move personIdString, "parm/output/personId";
+    move entityName, "parm/output/entityName";
+    move currentAmount.getAmount(), "parm/output/currentAmount";
+    move totalAmount.getAmount(), "parm/output/totalAmount";
+    move 'N', "parm/output/blockCc";
+    move 'N', "parm/output/blockAch";
+
+    return true;
+}    CM  015    0000000000    00000    0000000000    N00000100000        0000010    0012CM_GetCurBal026000000    00000EDDT000000000010    0180000            0222invokeGroovy 'invoke';    CM  016    14CI_SCR_FLD_MAP01012CI_SCR_PRMPT01014CI_SCR_PRMPT_L01013CI_SCR_STEP_L0160110012CM_GetCurBal0003ENG011N00467This script accepts Account ID as an input and returns the person information, accounts balances and response status as output. If the processing is successful, it returns 'OK' as the status and 'F' otherwise. For failed processing due to invalid account provided or some configurations are missing in the system upon the request, a To Do Entry will be created, and an email notification will be sent.
+
+Version History:
+2025-Oct-06    JGabri    CM065. Initial versionCM  0120012CM_GetCurBal0003ENG011N00006ImportCM  0130012CM_GetCurBal0003ENG011N00028Constants and Work VariablesCM  0140012CM_GetCurBal0003ENG011N00015Main ProcessingCM  0150012CM_GetCurBal0003ENG011N00016Get Field ValuesCM  0160012CM_GetCurBal0003ENG011N00022Invoke Main ProcessingCM  09F1_SCHEMA0110012CM_GetCurBalF1SC01403469<schema> 
+    <input type="group"> 
+        <accountId dataType="string"/> 
+    </input>  
+    <output type="group"> 
+        <personId dataType="string"/>  
+        <entityName dataType="string"/>  
+        <currentAmount dataType="number"/>  
+        <totalAmount dataType="number"/>  
+        <blockCc dataType="string"/>  
+        <blockAch dataType="string"/>  
+        <status dataType="string"/>  
+        <statusMsg dataType="string"/> 
+    </output> 
+</schema>CM
