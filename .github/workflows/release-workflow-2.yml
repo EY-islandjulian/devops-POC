@@ -115,7 +115,7 @@ jobs:
           echo "CMA file expected: $cma_file"
           
           # Output the CMA file name for later use
-          echo "cmafile=$cma_file" >> $GITHUB_ENV  # Correctly pass the file path as an environment variable
+          echo "cmafile=$cma_file" >> $GITHUB_ENV  # Correctly pass the full file path as an environment variable
 
       - name: List files in the subfolder (debug)
         run: |
@@ -125,8 +125,8 @@ jobs:
 
       - name: Debugging the CMA file path
         run: |
-          echo "Checking file: ${{ env.cmafile }}"  # Print the file path we expect to check
-          Get-ChildItem ${{ env.cmafile }}  # List the file to ensure it exists at the expected location
+          echo "Checking for CMA file pattern: ${{ env.cmafile }}"  # Print the file pattern we expect to check
+          Get-ChildItem -Recurse ${{ env.cmafile }}  # Search recursively for .cma files using the pattern
 
       - name: Locate CMA file based on folder name
         id: cma
@@ -165,4 +165,3 @@ jobs:
             -Password "$env:password" `
             -MigrationApi "$env:migration_import_api" `
             -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass the CMA file name to the script
-
