@@ -115,13 +115,18 @@ jobs:
           echo "CMA file expected: $cma_file"
           
           # Output the CMA file name for later use
-          echo "cmafile=$cma_file" >> $GITHUB_ENV
+          echo "cmafile=$cma_file" >> $GITHUB_ENV  # Correctly pass the file path as an environment variable
 
-      - name: List files in the subfolder
+      - name: List files in the subfolder (debug)
         run: |
           # List the files inside the subfolder to ensure the .cma file is there
           echo "Listing files in the folder: ${{ needs.auto-package.outputs.folder_name }}"
-          ls -l ${{ needs.auto-package.outputs.folder_name }}  # List contents of the subfolder
+          ls -R ${{ needs.auto-package.outputs.folder_name }}  # Recursively list contents of the subfolder
+
+      - name: Debugging the CMA file path
+        run: |
+          echo "Checking file: ${{ env.cmafile }}"  # Print the file path we expect to check
+          ls -l ${{ env.cmafile }}  # List the file to ensure it exists at the expected location
 
       - name: Locate CMA file based on folder name
         id: cma
@@ -131,9 +136,13 @@ jobs:
         run: |
           # Get the CMA file path passed from the environment variable
           $cma_file = $env:cmafile
-          
-          # Check if the CMA file exists in the subfolder
           echo "Looking for CMA file: $cma_file"
+          
+          # Debugging: List files in the repository and check if the path is valid
+          echo "Listing all files in the repository:"
+          ls -R  # List all files to confirm the structure
+
+          # Check if the CMA file exists in the subfolder
           if (Test-Path $cma_file) {
             Write-Host "Found CMA file: $cma_file"
           } else {
