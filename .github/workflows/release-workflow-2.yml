@@ -1,0 +1,108 @@
+name: Release Build
+
+on:
+  release:
+    types:
+      - created       # Trigger when a release is created
+      - edited        # Trigger when a release is updated (e.g., release notes or assets are updated)
+
+permissions:
+  contents: write  # Ensure the bot has write permissions to the repository
+  actions: read    # Allows actions to read metadata
+
+jobs:
+  auto-package:
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner for packaging step
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Check out the repository
+
+      - name: Get release title
+        id: release-title
+        run: |
+          # Extract the release title from the event context
+          echo "RELEASE_TITLE=${{ github.event.release.name }}" >> $GITHUB_ENV
+          echo "Release title: ${{ github.event.release.name }}"
+
+      - name: Install zip (if necessary)
+        run: sudo apt-get install -y zip  # Install zip if it's not already available
+
+      - name: Zip contents of a folder
+        id: zip-folder
+        run: |
+          # Use the release title as the folder name
+          folder_name="${{ env.RELEASE_TITLE }}"  # Folder name based on release title
+          echo "Folder name: $folder_name"
+          
+          # Zip the folder (replace with your actual folder if it exists)
+          zip -r "$folder_name.zip" "$folder_name"  # Zip the folder
+          ls -l "$folder_name.zip"  # List the zip file to verify it
+
+      - name: Set up Git for pushing
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # Fetch the latest updates from the remote
+          git fetch origin
+          # Check if the 'develop' branch exists, otherwise create it from the remote
+          git checkout develop || git checkout -b develop origin/develop  # If 'develop' doesn't exist locally, create it from the remote
+          git add "$folder_name.zip"
+          git commit -m "Add zip file $folder_name.zip" || echo "No changes to commit"  # Commit if there's a change
+          git push origin develop  # Push the changes to the remote 'develop' branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
+
+    outputs:
+      folder_name: ${{ env.RELEASE_TITLE }}  # Pass the release title as the folder name output for later use in cma-deploy
+
+  cma-deploy:
+    runs-on: self-hosted  # Self-hosted runner for CMA migration
+    needs: auto-package  # Ensure this job runs only after 'auto-package' finishes
+    environment:
+      name: C2MDEV  # Use the 'C2MDEV' environment for approval
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get folder name from auto-package job
+        id: get-folder-name
+        run: |
+          # Get the folder name passed from the auto-package job
+          folder_name="${{ needs.auto-package.outputs.folder_name }}"
+          echo "Folder name received: $folder_name"
+          # Construct the expected CMA file name
+          cma_file="$folder_name.cma"
+          echo "CMA file expected: $cma_file"
+          
+          # Output the CMA file name for later use
+          echo "cmafile=$cma_file" >> $GITHUB_ENV
+
+      - name: Locate CMA file based on folder name
+        id: cma
+        shell: pwsh
+        run: |
+          # Check if the CMA file exists
+          $cma_file = "${{ env.cmafile }}"
+          if (Test-Path $cma_file) {
+            Write-Host "Found CMA file: $cma_file"
+          } else {
+            Write-Host "CMA file not found for folder: $folder_name"
+            exit 1
+          }
+
+          # Output the file path for migration
+          Write-Output "cmafile=$cma_file" >> $env:GITHUB_OUTPUT
+
+      - name: Run Migration Script
+        env:
+          username: ${{ secrets.C2M_USER }}
+          password: ${{ secrets.C2M_PASS }}
+          migration_import_api: ${{ secrets.C2M_API_URL }}
+        run: |
+          # Run the migration script and pass the CMA file name located in the previous step
+          pwsh ./run-migration.ps1 `
+            -Username "$env:username" `
+            -Password "$env:password" `
+            -MigrationApi "$env:migration_import_api" `
+            -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass the CMA file name to the script
