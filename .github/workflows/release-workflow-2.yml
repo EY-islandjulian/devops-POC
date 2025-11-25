@@ -93,7 +93,7 @@ jobs:
     outputs:
       folder_name: ${{ env.RELEASE_TITLE }}  # Pass the release title as the folder name output for later use in cma-deploy
 
-  cma-deploy:
+    cma-deploy:
     runs-on: self-hosted  # Self-hosted runner for CMA migration
     needs: auto-package  # Ensure this job runs only after 'auto-package' finishes
     environment:
@@ -126,9 +126,11 @@ jobs:
       - name: Locate CMA file based on folder name
         id: cma
         shell: pwsh
+        env:
+          cmafile: ${{ env.cmafile }}  # Pass the environment variable to PowerShell
         run: |
-          # Get the CMA file path passed from the previous step
-          $cma_file = "${{ env.cmafile }}"
+          # Get the CMA file path passed from the environment variable
+          $cma_file = $env:cmafile
           
           # Check if the CMA file exists in the subfolder
           echo "Looking for CMA file: $cma_file"
@@ -154,5 +156,3 @@ jobs:
             -Password "$env:password" `
             -MigrationApi "$env:migration_import_api" `
             -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass the CMA file name to the script
-
-
