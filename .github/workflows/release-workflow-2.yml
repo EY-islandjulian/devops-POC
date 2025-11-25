@@ -120,7 +120,7 @@ jobs:
         shell: pwsh
         run: |
           # PowerShell: Define and assign the file name
-          $folder_name="${{ steps.get-folder-name.outputs.cmafile }}"  # Get the output from previous step
+          $folder_name="${{ needs.auto-package.outputs.folder_name }}"  # Get the output from previous step
           Write-Host "Looking for CMA file in folder: $folder_name"
           
           # Search for the CMA file within the subfolder
