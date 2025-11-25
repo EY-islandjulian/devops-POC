@@ -28,7 +28,7 @@ jobs:
           git fetch origin main || git checkout -b main  # Fetch or create branch if not found
           git add H2OA_CM065.001.zip
           git commit -m "Add zip file H2OA_CM065.001.zip" || echo "No changes to commit"  # Commit if there's a change
-          git push origin develop  # Push the commit to the develop branch
+          git push origin main  # Push the commit to the develop branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
 
