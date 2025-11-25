@@ -3,7 +3,7 @@ name: Auto Package
 on:
   push:
     branches:
-      - develop  # Trigger the action on push to the 'main' branch
+      - main  # Trigger the action on push to the 'main' branch
   workflow_dispatch:  # You can manually trigger this workflow as well
 
 jobs:
@@ -26,4 +26,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: zipped-folder
-          path: devops-POC/  # Specify the path of the resulting zip file
+          path: main/  # Specify the path of the resulting zip file
