@@ -140,7 +140,37 @@ jobs:
 
           # Output the file name for migration (only the file name, no full path)
           echo "cmafile=$($cma_file_path.Name)" >> $env:GITHUB_OUTPUT  # Only the file name (no full path)
+          
+      - name: Copy CMA file to the import directory
+        run: |
+          # Get the source CMA file path
+          source_file="${{ steps.get-folder-name.outputs.cmafile }}"  # Adjust path as needed
+          
+          # Define the destination path on the self-hosted runner
+          destination_dir="E:\\app\\ouaf\\sploutput\\EYAST-C2M29\\F1_CMA_FILES\\import"
+          
+          # Ensure the destination directory exists
+          mkdir -p $destination_dir
+          
+          # Copy the CMA file to the import directory
+          echo "Starting copying CMA file to the import Directory..."
+          cp $source_file $destination_dir
+          echo "Finished copying CMA file to the import Directory..."
+        
+      - name: Locate CMA file in the import directory
+       # id: cma
+        run: |
+          cma_file="${{ steps.get-folder-name.outputs.cmafile }}"
+          destination_file="E:\\app\\ouaf\\sploutput\\EYAST-C2M29\\F1_CMA_FILES\\import\\$cma_file"
+          echo "Looking for CMA file: $destination_file"
 
+          if [ -f "$destination_file" ]; then
+            echo "Found CMA file: $destination_file"
+          else
+            echo "CMA file not found: $destination_file"
+            exit 1  # Exit if the file doesn't exist
+          fi
+          
       - name: Run Migration Script
         env:
           username: ${{ secrets.C2M_USER }}
