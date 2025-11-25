@@ -106,10 +106,11 @@ jobs:
         id: get-folder-name
         run: |
           # Get the folder name passed from the auto-package job
-          folder_name="${{ needs.auto-package.outputs.folder_name }}"
+          $folder_name = "${{ needs.auto-package.outputs.folder_name }}"
           echo "Folder name received: $folder_name"
+          
           # Construct the expected CMA file name
-          cma_file="$folder_name.cma"
+          $cma_file = "$folder_name.cma"
           echo "CMA file expected: $cma_file"
           
           # Output the CMA file name for later use
@@ -119,8 +120,10 @@ jobs:
         id: cma
         shell: pwsh
         run: |
-          # Check if the CMA file exists
+          # Get the CMA file path passed from the previous step
           $cma_file = "${{ env.cmafile }}"
+
+          # Check if the CMA file exists
           if (Test-Path $cma_file) {
             Write-Host "Found CMA file: $cma_file"
           } else {
@@ -143,3 +146,4 @@ jobs:
             -Password "$env:password" `
             -MigrationApi "$env:migration_import_api" `
             -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass the CMA file name to the script
+
