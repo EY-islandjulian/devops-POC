@@ -6,6 +6,10 @@ on:
     - created       # Trigger when a release is created
     - edited        # Trigger when a release is updated (e.g., release notes or assets are updated)
 
+permissions:
+  contents: write  # Ensure the bot has write permissions to the repository
+  actions: read    # Allows actions to read metadata
+  
 jobs:
   auto-package:
     runs-on: ubuntu-latest  # Use the latest Ubuntu runner for packaging step
