@@ -3,7 +3,7 @@ name: Auto Package
 on:
   push:
     branches:
-      - devops-POC  # Trigger the action on push to the 'devops-POC' branch
+      - develop  # Trigger the action on push to the 'develop' branch
   workflow_dispatch:  # Optionally, manually trigger this workflow
 
 permissions:
