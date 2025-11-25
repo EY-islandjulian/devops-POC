@@ -159,10 +159,6 @@ jobs:
               Write-Host "CMA file not found: $source_file"
               exit 1  # Exit the step if the file cannot be found
           }
-
-          # Add a wait time to ensure the file copy operation completes
-          Write-Host "Waiting for 10 seconds to ensure the file is fully copied..."
-          Start-Sleep -Seconds 15  # Wait for 15 seconds
           
           # Define the destination path on the self-hosted runner
           $destination_dir = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
@@ -196,7 +192,10 @@ jobs:
             echo "CMA file not found: $destination_file"
             exit 1  # Exit if the file doesn't exist
           }
-
+          
+          # Add a wait time to ensure the file copy operation completes
+          Write-Host "Waiting for 15 seconds to ensure the file is fully copied..."
+          Start-Sleep -Seconds 15  # Wait for 15 seconds
 
       - name: Run Migration Script
         env:
