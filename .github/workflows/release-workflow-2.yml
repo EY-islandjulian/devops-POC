@@ -114,39 +114,26 @@ jobs:
           $cma_file = "$subfolder_path\$folder_name.cma"  # Path to the .cma file inside the folder
           echo "CMA file expected: $cma_file"
           
-          # Output the CMA file name for later use
-          echo "cmafile=$cma_file" >> $GITHUB_ENV  # Correctly pass the full file path as an environment variable
-
-      - name: List files in the subfolder (debug)
-        run: |
-          # List the files inside the subfolder to ensure the .cma file is there
-          echo "Listing files in the folder: ${{ needs.auto-package.outputs.folder_name }}"
-          Get-ChildItem -Recurse ${{ needs.auto-package.outputs.folder_name }}  # Recursively list contents of the subfolder
+          # Set the output to be used in the next step
+          echo "::set-output name=cmafile::$cma_file"  # Set output variable to be used later
 
       - name: Debugging the CMA file path
         run: |
-          echo "Checking for CMA file pattern: ${{ env.cmafile }}"  # Print the file pattern we expect to check
-          Get-ChildItem -Recurse ${{ env.cmafile }}  # Search recursively for .cma files using the pattern
+          echo "Checking for CMA file pattern: ${{ steps.get-folder-name.outputs.cmafile }}"  # Print the file pattern we expect to check
 
       - name: Locate CMA file based on folder name
         id: cma
         shell: pwsh
-        env:
-          cmafile: ${{ env.cmafile }}  # Pass the environment variable to PowerShell
         run: |
-          # Get the CMA file path passed from the environment variable
-          $cma_file = $env:cmafile
+          # Get the CMA file path passed from the previous step output
+          $cma_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Access the output from the previous step
           Write-Host "Looking for CMA file: $cma_file"
           
-          # Debugging: List files in the repository and check if the path is valid
-          echo "Listing all files in the repository:"
-          Get-ChildItem -Recurse  # List all files to confirm the structure
-
           # Check if the CMA file exists in the subfolder
           if (Test-Path $cma_file) {
             Write-Host "Found CMA file: $cma_file"
           } else {
-            Write-Host "CMA file not found for folder: $folder_name"
+            Write-Host "CMA file not found for folder: $cma_file"
             exit 1  # Exit if the file doesn't exist
           }
 
