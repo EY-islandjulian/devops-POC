@@ -93,7 +93,7 @@ jobs:
     outputs:
       folder_name: ${{ env.RELEASE_TITLE }}  # Pass the release title as the folder name output for later use in cma-deploy
 
-  cma-deploy:
+    cma-deploy:
     runs-on: self-hosted  # Self-hosted runner for CMA migration
     needs: auto-package  # Ensure this job runs only after 'auto-package' finishes
     environment:
@@ -109,12 +109,19 @@ jobs:
           $folder_name = "${{ needs.auto-package.outputs.folder_name }}"
           echo "Folder name received: $folder_name"
           
-          # Construct the expected CMA file name
-          $cma_file = "$folder_name.cma"
+          # Construct the expected CMA file name and subfolder path
+          $subfolder_path = "$folder_name"  # Folder where the CMA file is located
+          $cma_file = "$subfolder_path/$folder_name.cma"  # Path to the .cma file inside the folder
           echo "CMA file expected: $cma_file"
           
           # Output the CMA file name for later use
           echo "cmafile=$cma_file" >> $GITHUB_ENV
+
+      - name: List files in the subfolder
+        run: |
+          # List the files inside the subfolder to ensure the .cma file is there
+          echo "Listing files in the folder: ${{ needs.auto-package.outputs.folder_name }}"
+          ls -l ${{ needs.auto-package.outputs.folder_name }}  # List contents of the subfolder
 
       - name: Locate CMA file based on folder name
         id: cma
@@ -122,13 +129,14 @@ jobs:
         run: |
           # Get the CMA file path passed from the previous step
           $cma_file = "${{ env.cmafile }}"
-
-          # Check if the CMA file exists
+          
+          # Check if the CMA file exists in the subfolder
+          echo "Looking for CMA file: $cma_file"
           if (Test-Path $cma_file) {
             Write-Host "Found CMA file: $cma_file"
           } else {
             Write-Host "CMA file not found for folder: $folder_name"
-            exit 1
+            exit 1  # Exit if the file doesn't exist
           }
 
           # Output the file path for migration
@@ -146,4 +154,5 @@ jobs:
             -Password "$env:password" `
             -MigrationApi "$env:migration_import_api" `
             -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass the CMA file name to the script
+
 
