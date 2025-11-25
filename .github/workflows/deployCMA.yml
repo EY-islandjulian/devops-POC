@@ -1,0 +1,34 @@
+name: CMA Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Locate CMA file
+        id: cma
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem *.cma | Select-Object -First 1
+          if (-not $file) {
+            Write-Host "No CMA file found!"
+            exit 1
+          }
+          Write-Output "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
+
+      - name: Run Migration Script
+        env:
+          username: ${{ secrets.C2M_USER }}
+          password: ${{ secrets.C2M_PASS }}
+          migration_import_api: ${{ secrets.C2M_API_URL }}
+        run: |
+          pwsh ./run-migration.ps1 `
+            -Username "$env:username" `
+            -Password "$env:password" `
+            -MigrationApi "$env:migration_import_api" `
+            -CmaFile "${{ steps.cma.outputs.cmafile }}"
