@@ -104,36 +104,32 @@ jobs:
       - name: Get folder name from auto-package job
         id: get-folder-name
         run: |
-          # Get the folder name passed from the auto-package job
-          folder_name="${{ needs.auto-package.outputs.folder_name }}"
+          # PowerShell: Get the folder name passed from the auto-package job
+          $folder_name="${{ needs.auto-package.outputs.folder_name }}"
           echo "Folder name received: $folder_name"
           
           # Construct the expected CMA file name (without the folder path)
-          cma_file="$folder_name.cma"  # Only the file name, no folder path
+          $cma_file="$folder_name.cma"  # Only the file name, no folder path
           echo "CMA file expected: $cma_file"
           
           # Set the output to be used in the next step (only the file name, no full path)
           echo "::set-output name=cmafile::$cma_file"  # Only the file name, not the full path
-
-      - name: Debugging the CMA file path
-        run: |
-          echo "Checking for CMA file pattern: ${{ steps.get-folder-name.outputs.cmafile }}"  # Print the expected file name
 
       - name: Locate CMA file based on folder name
         id: cma
         shell: pwsh
         run: |
           # PowerShell: Define and assign the file name
-          $cma_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Access the file name output
-          Write-Host "Looking for CMA file: $cma_file"
+          $folder_name="${{ steps.get-folder-name.outputs.cmafile }}"  # Get the output from previous step
+          Write-Host "Looking for CMA file in folder: $folder_name"
           
           # Search for the CMA file within the subfolder
-          $cma_file_path = Get-ChildItem -Recurse -Filter $cma_file | Select-Object -First 1  # Recursively find the .cma file
+          $cma_file_path = Get-ChildItem -Recurse -Filter "$folder_name.cma" | Select-Object -First 1  # Recursively find the .cma file
           
           if ($cma_file_path) {
             Write-Host "Found CMA file: $($cma_file_path.FullName)"
           } else {
-            Write-Host "CMA file not found for folder: $cma_file"
+            Write-Host "CMA file not found for folder: $folder_name"
             exit 1  # Exit if the file doesn't exist
           }
 
@@ -142,17 +138,18 @@ jobs:
 
       - name: Verify CMA File Exists Before Copying
         run: |
-          folder_name="${{ steps.get-folder-name.outputs.cmafile }}"
-          cma_file="${folder_name}.cma"  # Ensure correct CMA file name with extension
+          # PowerShell syntax for variable assignment
+          $folder_name="${{ steps.get-folder-name.outputs.cmafile }}"  # Correctly reference the folder name variable
+          $cma_file="$folder_name.cma"  # Ensure correct CMA file name with extension
           echo "Looking for CMA file: $cma_file"
 
           # Check if the CMA file exists in the directory
-          if [ -f "$cma_file" ]; then
+          if (Test-Path $cma_file) {
             echo "Found CMA file: $cma_file"
-          else
+          } else {
             echo "Error: CMA file not found: $cma_file"
             exit 1  # Exit if the file doesn't exist
-          fi
+          }
 
       - name: Copy CMA file to the import directory
         run: |
