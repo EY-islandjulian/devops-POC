@@ -46,8 +46,7 @@ jobs:
       - name: Zip contents of a folder
         id: zip-folder
         run: |
-          # Use the release title as the folder name
-          folder_name="${{ env.RELEASE_TITLE }}"  # Folder name based on release title
+          folder_name="${{ env.RELEASE_TITLE }}"
           echo "Folder name: $folder_name"
           
           # Zip the folder (replace with your actual folder if it exists)
@@ -72,7 +71,7 @@ jobs:
           echo "Listing files before git add:"
           ls -l  # This will show the file paths in the working directory
 
-          # Use a dynamic reference to the zip file name based on the folder name (e.g., EXT-0011.CodeConfig.zip)
+          # Use a dynamic reference to the zip file name based on the folder name
           folder_name="${{ env.RELEASE_TITLE }}"
           zip_file="${folder_name}.zip"  # Construct the zip file name
 
@@ -106,11 +105,11 @@ jobs:
         id: get-folder-name
         run: |
           # Get the folder name passed from the auto-package job
-          $folder_name = "${{ needs.auto-package.outputs.folder_name }}"
+          folder_name="${{ needs.auto-package.outputs.folder_name }}"
           echo "Folder name received: $folder_name"
           
           # Construct the expected CMA file name (without the folder path)
-          $cma_file = "$folder_name.cma"  # Only the file name, no folder path
+          cma_file="$folder_name.cma"  # Only the file name, no folder path
           echo "CMA file expected: $cma_file"
           
           # Set the output to be used in the next step (only the file name, no full path)
@@ -140,7 +139,21 @@ jobs:
 
           # Output the file name for migration (only the file name, no full path)
           echo "cmafile=$($cma_file_path.Name)" >> $env:GITHUB_OUTPUT  # Only the file name (no full path)
-          
+
+      - name: Verify CMA File Exists Before Copying
+        run: |
+          folder_name="${{ steps.get-folder-name.outputs.cmafile }}"
+          cma_file="${folder_name}.cma"  # Ensure correct CMA file name with extension
+          echo "Looking for CMA file: $cma_file"
+
+          # Check if the CMA file exists in the directory
+          if [ -f "$cma_file" ]; then
+            echo "Found CMA file: $cma_file"
+          else
+            echo "Error: CMA file not found: $cma_file"
+            exit 1  # Exit if the file doesn't exist
+          fi
+
       - name: Copy CMA file to the import directory
         run: |
           # PowerShell syntax for variable assignment
@@ -159,6 +172,10 @@ jobs:
               Write-Host "CMA file not found: $source_file"
               exit 1  # Exit the step if the file cannot be found
           }
+
+          # Add a wait time to ensure the file copy operation completes
+          Write-Host "Waiting for 15 seconds to ensure the file is fully copied..."
+          Start-Sleep -Seconds 15  # Wait for 15 seconds
           
           # Define the destination path on the self-hosted runner
           $destination_dir = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
@@ -192,10 +209,6 @@ jobs:
             echo "CMA file not found: $destination_file"
             exit 1  # Exit if the file doesn't exist
           }
-          
-          # Add a wait time to ensure the file copy operation completes
-          Write-Host "Waiting for 15 seconds to ensure the file is fully copied..."
-          Start-Sleep -Seconds 15  # Wait for 15 seconds
 
       - name: Run Migration Script
         env:
@@ -204,8 +217,8 @@ jobs:
           migration_import_api: ${{ secrets.C2M_API_URL }}
         run: |
           # Run the migration script and pass the CMA file name located in the previous step
-          pwsh ./run-migration.ps1 `
-            -Username "$env:username" `
-            -Password "$env:password" `
-            -MigrationApi "$env:migration_import_api" `
+          pwsh ./run-migration.ps1 ` 
+            -Username "$env:username" ` 
+            -Password "$env:password" ` 
+            -MigrationApi "$env:migration_import_api" ` 
             -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass only the CMA file name to the script (no path)
