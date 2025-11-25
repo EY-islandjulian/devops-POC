@@ -144,25 +144,39 @@ jobs:
       - name: Copy CMA file to the import directory
         run: |
           # PowerShell syntax for variable assignment
-          $source_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Adjust path as needed
+          $source_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # This is just the file name (e.g., EXT-0011.CodeConfig.cma)
+
+          # Define the base path where the repository is checked out (adjust if necessary)
+          $repo_base_path = "C:\actions-runner\_work\devops-POC\devops-POC"
+
+          # Use Get-ChildItem to recursively search for the .cma file within the repo directory
+          $source_file_path = Get-ChildItem -Path $repo_base_path -Recurse -Filter $source_file | Select-Object -First 1
+
+          # Check if we found the file
+          if ($source_file_path) {
+              Write-Host "Found CMA file: $($source_file_path.FullName)"
+          } else {
+              Write-Host "CMA file not found: $source_file"
+              exit 1  # Exit the step if the file cannot be found
+          }
 
           # Define the destination path on the self-hosted runner
           $destination_dir = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
 
           # Check if the destination directory exists, and create it if it doesn't
           if (-not (Test-Path $destination_dir)) {
-            Write-Host "Directory does not exist. Creating: $destination_dir"
-            New-Item -ItemType Directory -Path $destination_dir
+              Write-Host "Directory does not exist. Creating: $destination_dir"
+              New-Item -ItemType Directory -Path $destination_dir
           } else {
-            Write-Host "Directory already exists: $destination_dir"
+              Write-Host "Directory already exists: $destination_dir"
           }
 
           # Debugging the source file path
-          Write-Host "Source file: $source_file"
+          Write-Host "Source file path: $($source_file_path.FullName)"
           
           # Copy the CMA file to the import directory
           Write-Host "Starting copying CMA file to the import Directory..."
-          Copy-Item -Path $source_file -Destination $destination_dir
+          Copy-Item -Path $source_file_path.FullName -Destination $destination_dir
           Write-Host "Finished copying CMA file to the import Directory..."
 
       - name: Locate CMA file in the import directory
