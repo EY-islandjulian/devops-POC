@@ -72,9 +72,20 @@ jobs:
           echo "Listing files before git add:"
           ls -l  # This will show the file paths in the working directory
 
-          # Add the zip file generated from the folder_name (exact filename)
-          git add "$folder_name.zip"  # Ensure we're referencing the correct filename
-          git commit -m "Add zip file $folder_name.zip" || echo "No changes to commit"  # Commit if there's a change
+          # Use a dynamic reference to the zip file name based on the folder name (e.g., EXT-0011.CodeConfig.zip)
+          folder_name="${{ env.RELEASE_TITLE }}"
+          zip_file="${folder_name}.zip"  # Construct the zip file name
+
+          # Check if the zip file exists and add it
+          if [ -f "$zip_file" ]; then
+            git add "$zip_file"
+            echo "Added $zip_file to commit."
+          else
+            echo "Error: $zip_file does not exist. Cannot add to Git."
+            exit 1  # Exit the job if the file is not found
+          fi
+
+          git commit -m "Add zip file $zip_file" || echo "No changes to commit"  # Commit if there's a change
           git push origin develop  # Push the changes to the remote 'develop' branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
