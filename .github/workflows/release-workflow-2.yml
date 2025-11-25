@@ -93,7 +93,7 @@ jobs:
     outputs:
       folder_name: ${{ env.RELEASE_TITLE }}  # Pass the release title as the folder name output for later use in cma-deploy
 
-    cma-deploy:
+  cma-deploy:
     runs-on: self-hosted  # Self-hosted runner for CMA migration
     needs: auto-package  # Ensure this job runs only after 'auto-package' finishes
     environment:
