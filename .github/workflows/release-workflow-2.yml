@@ -182,10 +182,10 @@ jobs:
       - name: Locate CMA file in the import directory
         run: |
           $cma_file="${{ steps.get-folder-name.outputs.cmafile }}"
-          destination_file="E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import\$cma_file"
+          $destination_file="E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import\$($cma_file)"
           echo "Looking for CMA file: $destination_file"
 
-          # Use PowerShell's Test-Path to check if the file exists
+          # Check if the file exists in the destination directory
           if (Test-Path $destination_file) {
             echo "Found CMA file: $destination_file"
           } else {
