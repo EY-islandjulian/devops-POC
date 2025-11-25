@@ -37,17 +37,26 @@ jobs:
           
           # Zip the folder (replace with your actual folder if it exists)
           zip -r "$folder_name.zip" "$folder_name"  # Zip the folder
-          ls -l "$folder_name.zip"  # List the zip file to verify it
+          
+          # List the directory contents to confirm that the file exists
+          ls -l  # This will list all files in the current directory
 
       - name: Set up Git for pushing
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
           # Fetch the latest updates from the remote
           git fetch origin
+          
           # Check if the 'develop' branch exists, otherwise create it from the remote
           git checkout develop || git checkout -b develop origin/develop  # If 'develop' doesn't exist locally, create it from the remote
-          git add "$folder_name.zip"
+          
+          # List files in the directory to verify the .zip file exists
+          ls -l  # This will show the file paths in the working directory
+
+          # Add the zip file generated from the folder_name
+          git add "$folder_name.zip"  # Use folder_name.zip as the file name
           git commit -m "Add zip file $folder_name.zip" || echo "No changes to commit"  # Commit if there's a change
           git push origin develop  # Push the changes to the remote 'develop' branch
         env:
