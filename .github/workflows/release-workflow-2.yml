@@ -181,7 +181,7 @@ jobs:
 
       - name: Locate CMA file in the import directory
         run: |
-          cma_file="${{ steps.get-folder-name.outputs.cmafile }}"
+          $cma_file="${{ steps.get-folder-name.outputs.cmafile }}"
           destination_file="E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import\$cma_file"
           echo "Looking for CMA file: $destination_file"
 
