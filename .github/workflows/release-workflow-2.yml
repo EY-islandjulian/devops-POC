@@ -111,7 +111,7 @@ jobs:
           
           # Construct the expected CMA file name and subfolder path
           $subfolder_path = "$folder_name"  # Folder where the CMA file is located
-          $cma_file = "$subfolder_path/$folder_name.cma"  # Path to the .cma file inside the folder
+          $cma_file = "$subfolder_path\$folder_name.cma"  # Path to the .cma file inside the folder
           echo "CMA file expected: $cma_file"
           
           # Output the CMA file name for later use
@@ -136,7 +136,7 @@ jobs:
         run: |
           # Get the CMA file path passed from the environment variable
           $cma_file = $env:cmafile
-          echo "Looking for CMA file: $cma_file"
+          Write-Host "Looking for CMA file: $cma_file"
           
           # Debugging: List files in the repository and check if the path is valid
           echo "Listing all files in the repository:"
@@ -165,3 +165,4 @@ jobs:
             -Password "$env:password" `
             -MigrationApi "$env:migration_import_api" `
             -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass the CMA file name to the script
+
