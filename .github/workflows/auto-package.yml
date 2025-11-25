@@ -4,7 +4,10 @@ on:
   push:
     branches:
       - devops-POC  # Trigger the action on push to the 'devops-POC' branch
-  workflow_dispatch:  # You can manually trigger this workflow as well
+  workflow_dispatch:  # Optionally, manually trigger this workflow
+
+permissions:
+  contents: write  # This grants write access to the repository's contents
 
 jobs:
   zip:
@@ -22,15 +25,18 @@ jobs:
           folder_name="H2OA_CM065.001"  # Specify the folder to zip
           zip -r "H2OA_CM065.001.zip" "$folder_name"  # Zip the folder
 
-      - name: Set up Git
+          # Verify that the zip file is created
+          ls -l H2OA_CM065.001.zip  # List the zip file
+
+      - name: Set up Git for pushing
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Commit and push the zip file to the branch
-        run: |
-          git add H2OA_CM065.001.zip  # Add the zip file to staging
-          git commit -m "Add zip file H2OA_CM065.001.zip"  # Commit the zip file
-          git push origin develop  # Push the commit to the devops-POC branch
+          
+          # Check if the branch exists and fetch or create it if necessary
+          git fetch origin devops-POC || git checkout -b devops-POC  # Fetch or create branch if not found
+          git add H2OA_CM065.001.zip
+          git commit -m "Add zip file H2OA_CM065.001.zip" || echo "No changes to commit"  # Commit if there's a change
+          git push origin develop  # Push the commit to the develop branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for authentication
