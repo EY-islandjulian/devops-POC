@@ -121,12 +121,12 @@ jobs:
         run: |
           # List the files inside the subfolder to ensure the .cma file is there
           echo "Listing files in the folder: ${{ needs.auto-package.outputs.folder_name }}"
-          ls -R ${{ needs.auto-package.outputs.folder_name }}  # Recursively list contents of the subfolder
+          Get-ChildItem -Recurse ${{ needs.auto-package.outputs.folder_name }}  # Recursively list contents of the subfolder
 
       - name: Debugging the CMA file path
         run: |
           echo "Checking file: ${{ env.cmafile }}"  # Print the file path we expect to check
-          ls -l ${{ env.cmafile }}  # List the file to ensure it exists at the expected location
+          Get-ChildItem ${{ env.cmafile }}  # List the file to ensure it exists at the expected location
 
       - name: Locate CMA file based on folder name
         id: cma
@@ -140,7 +140,7 @@ jobs:
           
           # Debugging: List files in the repository and check if the path is valid
           echo "Listing all files in the repository:"
-          ls -R  # List all files to confirm the structure
+          Get-ChildItem -Recurse  # List all files to confirm the structure
 
           # Check if the CMA file exists in the subfolder
           if (Test-Path $cma_file) {
