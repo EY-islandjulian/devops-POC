@@ -124,7 +124,7 @@ jobs:
         id: cma
         shell: pwsh
         run: |
-          # Get the CMA file name passed from the previous step output (file name only, no folder)
+          # PowerShell: Define and assign the file name
           $cma_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Access the file name output
           Write-Host "Looking for CMA file: $cma_file"
           
