@@ -38,7 +38,8 @@ jobs:
           # Zip the folder (replace with your actual folder if it exists)
           zip -r "$folder_name.zip" "$folder_name"  # Zip the folder
           
-          # List the directory contents to confirm that the file exists
+          # List the directory contents to confirm that the .zip file is created
+          echo "Listing files in the current directory:"
           ls -l  # This will list all files in the current directory
 
       - name: Set up Git for pushing
@@ -53,6 +54,7 @@ jobs:
           git checkout develop || git checkout -b develop origin/develop  # If 'develop' doesn't exist locally, create it from the remote
           
           # List files in the directory to verify the .zip file exists
+          echo "Listing files before git add:"
           ls -l  # This will show the file paths in the working directory
 
           # Add the zip file generated from the folder_name
