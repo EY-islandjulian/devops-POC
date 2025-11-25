@@ -25,7 +25,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin develop || git checkout -b develop  # Fetch or create branch if not found
+          git fetch origin main || git checkout -b main  # Fetch or create branch if not found
           git add H2OA_CM065.001.zip
           git commit -m "Add zip file H2OA_CM065.001.zip" || echo "No changes to commit"  # Commit if there's a change
           git push origin develop  # Push the commit to the develop branch
