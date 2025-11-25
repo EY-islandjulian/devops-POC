@@ -6,22 +6,37 @@ on:
 
 jobs:
   auto-package:
-    runs-on: ubuntu-latest  # Use Ubuntu runner for packaging step
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner for packaging step
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # Check out the repository
 
-      - name: Trigger Auto Package Workflow
-        uses: actions/github-script@v6
-        with:
-          script: |
-            console.log("Auto package workflow triggered")
+      - name: Install zip (if necessary)
+        run: sudo apt-get install -y zip  # Install zip if it's not already available
+
+      - name: Zip contents of a folder
+        run: |
+          folder_name="H2OA_CM065.001"  # Specify the folder to zip
+          zip -r "H2OA_CM065.001.zip" "$folder_name"  # Zip the folder
+          ls -l H2OA_CM065.001.zip  # List the zip file to verify it
+
+      - name: Set up Git for pushing
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin develop || git checkout -b develop  # Fetch or create branch if not found
+          git add H2OA_CM065.001.zip
+          git commit -m "Add zip file H2OA_CM065.001.zip" || echo "No changes to commit"  # Commit if there's a change
+          git push origin develop  # Push the commit to the develop branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
 
   cma-deploy:
-    runs-on: self-hosted  # Self-hosted runner for CMA deployment
+    runs-on: self-hosted  # Self-hosted runner for CMA migration
+    needs: auto-package  # Ensure this job runs only after 'auto-package' finishes
     environment:
-      name: production  # Use the 'production' environment for approval
-      url: ${{ steps.deploy.outputs.deployment_url }}  # Optional URL to track the deployment status
+      name: C2MDEV  # Use the 'C2MDEV' environment for approval
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
