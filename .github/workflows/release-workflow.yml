@@ -27,12 +27,14 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if the branch exists and fetch or create it if necessary
           git fetch origin develop || git checkout -b develop  # Fetch or create branch if not found
           git add H2OA_CM065.001.zip
           git commit -m "Add zip file H2OA_CM065.001.zip" || echo "No changes to commit"  # Commit if there's a change
           git push origin develop  # Push the commit to the develop branch
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for authentication
 
   cma-deploy:
     runs-on: self-hosted  # Self-hosted runner for CMA migration
