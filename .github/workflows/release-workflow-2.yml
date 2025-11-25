@@ -109,36 +109,38 @@ jobs:
           $folder_name = "${{ needs.auto-package.outputs.folder_name }}"
           echo "Folder name received: $folder_name"
           
-          # Construct the expected CMA file name and subfolder path
-          $subfolder_path = "$folder_name"  # Folder where the CMA file is located
-          $cma_file = "$subfolder_path\$folder_name.cma"  # Path to the .cma file inside the folder
+          # Construct the expected CMA file name
+          # Here, we just want the file name, so we don't include the folder
+          $cma_file = "$folder_name.cma"  # Only the file name, no folder path
           echo "CMA file expected: $cma_file"
           
           # Set the output to be used in the next step
-          echo "::set-output name=cmafile::$cma_file"  # Set output variable to be used later
+          echo "::set-output name=cmafile::$cma_file"  # Set the file name output, not the full path
 
       - name: Debugging the CMA file path
         run: |
-          echo "Checking for CMA file pattern: ${{ steps.get-folder-name.outputs.cmafile }}"  # Print the file pattern we expect to check
+          echo "Checking for CMA file pattern: ${{ steps.get-folder-name.outputs.cmafile }}"  # Print the expected file pattern
 
       - name: Locate CMA file based on folder name
         id: cma
         shell: pwsh
         run: |
-          # Get the CMA file path passed from the previous step output
-          $cma_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Access the output from the previous step
+          # Get the CMA file name passed from the previous step output (file name only, no folder)
+          $cma_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Access the file name output
           Write-Host "Looking for CMA file: $cma_file"
           
-          # Check if the CMA file exists in the subfolder
-          if (Test-Path $cma_file) {
-            Write-Host "Found CMA file: $cma_file"
+          # Check if the CMA file exists (searching within the folder)
+          $cma_file_path = Get-ChildItem -Recurse -Filter $cma_file | Select-Object -First 1  # Recursively find the .cma file
+          
+          if ($cma_file_path) {
+            Write-Host "Found CMA file: $($cma_file_path.FullName)"
           } else {
             Write-Host "CMA file not found for folder: $cma_file"
             exit 1  # Exit if the file doesn't exist
           }
 
           # Output the file path for migration
-          Write-Output "cmafile=$cma_file" >> $env:GITHUB_OUTPUT
+          Write-Output "cmafile=$($cma_file_path.FullName)" >> $env:GITHUB_OUTPUT
 
       - name: Run Migration Script
         env:
