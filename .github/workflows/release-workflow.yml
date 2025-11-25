@@ -1,0 +1,31 @@
+name: Release Build
+
+on:
+  release:
+    types: [created]  # Trigger when a release is created
+
+jobs:
+  release:
+    runs-on: ubuntu-latest  # You can also use a Windows runner for certain tasks if needed
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Checkout code
+
+      - name: Trigger Auto Package Workflow
+        uses: peter-evans/workflow-dispatch@v1
+        with:
+          workflow: auto-package.yml  # The Auto Package workflow
+          ref: ${{ github.ref }}  # Trigger it on the current release branch
+
+      - name: Await approval for CMA deployment
+        run: |
+          echo "This step is waiting for approval before proceeding."
+        approval:
+          required: true  # Require manual approval to continue the workflow
+
+      - name: Trigger CMA Deploy Workflow
+        uses: peter-evans/workflow-dispatch@v1
+        with:
+          workflow: cma-deploy.yml  # The CMA Deploy workflow
+          ref: ${{ github.ref }}  # Trigger it on the current release branch
