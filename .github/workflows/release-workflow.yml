@@ -2,7 +2,9 @@ name: Release Build
 
 on:
   release:
-    types: [created]  # Trigger when a release is created
+    types:
+    - created       # Trigger when a release is created
+    - edited        # Trigger when a release is updated (e.g., release notes or assets are updated)
 
 jobs:
   auto-package:
