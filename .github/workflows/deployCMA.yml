@@ -1,0 +1,55 @@
+name: Deploy CMA - Current
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  cma-deploy:
+    runs-on: self-hosted
+
+    steps:
+
+    - name: OUAFDeploy
+      shell: pwsh 
+      run: |
+          Write-Host "Starting CMA Deployment Pipeline..."
+          #displayName: "Retrieve CMA file and Work item in the message"
+          
+          
+          $cmafile = "EXT-0008.CodeConfig.cma"
+          Write-Host "Testing CMA FILE NAME $cmafile"
+          $cmaDirectory = Get-ChildItem -Recurse "$env:GITHUB_WORKSPACE" -Filter "$cmafile" | Select-Object -ExpandProperty FullName
+          Write-Host "Directory: $cmaDirectory"
+          if ([string]::IsNullOrEmpty($cmaDirectory)){
+               Write-Error "CMA file not found: $cmafile"
+               exit 1
+          }
+
+           Write-Host "Starting copying files to the import Directory..."
+
+           Copy-Item -Path "$cmaDirectory" -Destination "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import" -Force -ErrorAction Stop 
+
+           Write-Host "Finished copying files to the import Directory..."
+
+            #displayName: "Copy CMA file to the import directory"
+           # Export variable to next steps
+          "CMA_FILE=$cmafile" | Out-File -FilePath $env:GITHUB_ENV -Append
+# -----------------------
+    # 6. Run Migration Script
+    # -----------------------
+    - name: Run Migration Script
+      shell: pwsh
+      env:
+        username: ${{ secrets.C2M_USER }}
+        password: ${{ secrets.C2M_PASS }}
+        migration_import_api: ${{ secrets.C2M_API_URL }}
+      run: |
+        pwsh ./run-migration.ps1 `
+          -Username "$env:username" `
+          -Password "$env:password" `
+          -MigrationApi "$env:migration_import_api" `
+          -CmaFile "$env:CMA_FILE"
