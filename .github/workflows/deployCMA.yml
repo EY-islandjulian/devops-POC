@@ -52,4 +52,4 @@ jobs:
           -Username "$env:username" `
           -Password "$env:password" `
           -MigrationApi "$env:migration_import_api" `
-          -CmaFile "$env:CMA_FILE"
+          -CmaFile "$env:CMA_FILE" `
