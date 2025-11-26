@@ -20,7 +20,7 @@ jobs:
           #displayName: "Retrieve CMA file and Work item in the message"
           
           
-          $cmafile = "EXT-0008.CodeConfig.cma"
+          $cmafile = "EXT-001.CodeConfig.cma"
           Write-Host "Testing CMA FILE NAME $cmafile"
           $cmaDirectory = Get-ChildItem -Recurse "$env:GITHUB_WORKSPACE" -Filter "$cmafile" | Select-Object -ExpandProperty FullName
           Write-Host "Directory: $cmaDirectory"
