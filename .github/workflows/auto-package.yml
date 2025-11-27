@@ -43,9 +43,9 @@ jobs:
         echo "Listing contents of $TARGET_FOLDER before moving files:"
         ls "$TARGET_FOLDER"
         
-        # Move TD files
+        # Move TD files that are not in subfolders
         echo "Moving TD files"
-        files=$(find "$TARGET_FOLDER" -type f -name '*TD*')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*TD*')
         echo "Found TD files: $files"
         
         for file in $files; do
@@ -59,9 +59,9 @@ jobs:
           fi
         done
 
-        # Move FD files
+        # Move FD files that are not in subfolders
         echo "Moving FD files"
-        files=$(find "$TARGET_FOLDER" -type f -name '*FD*')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*FD*')
         echo "Found FD files: $files"
         
         for file in $files; do
@@ -75,9 +75,9 @@ jobs:
           fi
         done
 
-        # Move cm* files
+        # Move cm* files that are not in subfolders
         echo "Moving cm* files"
-        files=$(find "$TARGET_FOLDER" -type f -name 'cm*')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name 'cm*')
         echo "Found cm* files: $files"
         
         for file in $files; do
@@ -91,9 +91,9 @@ jobs:
           fi
         done
 
-        # Move .cma files
+        # Move .cma files that are not in subfolders
         echo "Moving .cma files"
-        files=$(find "$TARGET_FOLDER" -type f -name '*.cma')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*.cma')
         echo "Found .cma files: $files"
         
         for file in $files; do
