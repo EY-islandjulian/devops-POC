@@ -95,29 +95,19 @@ jobs:
         # Find and delete files only in the root directory that are not in subfolders
         find "$TARGET_FOLDER" -maxdepth 1 -type f ! -name 'Technical_Design/*' ! -name 'Functional_Design/*' ! -name 'Scripts/*' ! -name 'CMA/*' -exec rm -f {} \;
 
-    - name: Debug the directory contents
+    - name: Stage file deletions and commit changes
       run: |
-        # List the files in the subfolders to ensure files were moved successfully
-        echo "Listing files in $TARGET_FOLDER/Technical_Design:"
-        ls "$TARGET_FOLDER/Technical_Design/"
+        # Stage the deletions so Git tracks them
+        echo "Staging deleted files"
         
-        echo "Listing files in $TARGET_FOLDER/Functional_Design:"
-        ls "$TARGET_FOLDER/Functional_Design/"
+        # Stage deleted files in the root directory
+        git rm -f "$TARGET_FOLDER"/*  # This removes files in the root folder that are no longer needed
         
-        echo "Listing files in $TARGET_FOLDER/Scripts:"
-        ls "$TARGET_FOLDER/Scripts/"
-        
-        echo "Listing files in $TARGET_FOLDER/CMA:"
-        ls "$TARGET_FOLDER/CMA/"
-
-    - name: Commit and push changes
-      run: |
-        # Check if files were moved, and add only the moved files
-        echo "Adding files to Git:"
+        # Stage the added files in subfolders
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
-        # Commit the changes if there are any
-        git commit -m "Organized files in $TARGET_FOLDER" || echo "No changes to commit"
+        # Commit the changes (move + deletions)
+        git commit -m "Organized files in $TARGET_FOLDER and removed unneeded files" || echo "No changes to commit"
         
         # Push the changes to the repository
         git push origin HEAD:develop  # Push to the main branch (adjust if using a different branch)
