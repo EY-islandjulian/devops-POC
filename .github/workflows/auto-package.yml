@@ -46,22 +46,26 @@ jobs:
         echo "Moving TD files"
         files=$(find "$TARGET_FOLDER" -type f -name '*TD*')
         echo "Found TD files: $files"
-        mv $files "$TARGET_FOLDER/Technical_Design/" || true
+        echo "Moving files to $TARGET_FOLDER/Technical_Design/"
+        mv $files "$TARGET_FOLDER/Technical_Design/" || { echo "Error moving TD files"; exit 1; }
         
         echo "Moving FD files"
         files=$(find "$TARGET_FOLDER" -type f -name '*FD*')
         echo "Found FD files: $files"
-        mv $files "$TARGET_FOLDER/Functional_Design/" || true
+        echo "Moving files to $TARGET_FOLDER/Functional_Design/"
+        mv $files "$TARGET_FOLDER/Functional_Design/" || { echo "Error moving FD files"; exit 1; }
         
         echo "Moving cm* files"
         files=$(find "$TARGET_FOLDER" -type f -name 'cm*')
         echo "Found cm* files: $files"
-        mv $files "$TARGET_FOLDER/Scripts/" || true
+        echo "Moving files to $TARGET_FOLDER/Scripts/"
+        mv $files "$TARGET_FOLDER/Scripts/" || { echo "Error moving cm* files"; exit 1; }
         
         echo "Moving .cma files"
         files=$(find "$TARGET_FOLDER" -type f -name '*.cma')
         echo "Found .cma files: $files"
-        mv $files "$TARGET_FOLDER/CMA/" || true
+        echo "Moving files to $TARGET_FOLDER/CMA/"
+        mv $files "$TARGET_FOLDER/CMA/" || { echo "Error moving .cma files"; exit 1; }
 
     - name: Debug the directory contents
       run: |
@@ -80,7 +84,7 @@ jobs:
 
     - name: Commit and push changes
       run: |
-        # Use relative paths from the repository root for git add
+        # Check if files were moved, and add only the moved files
         echo "Adding files to Git:"
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
@@ -88,7 +92,7 @@ jobs:
         git commit -m "Organized files in $TARGET_FOLDER" || echo "No changes to commit"
         
         # Push the changes to the repository
-        git push origin HEAD:main  # Push to the main branch (change this if you're using a different branch)
+        git push origin HEAD:develop  # Push to the main branch (change this if you're using a different branch)
       env:
         # GitHub token is automatically provided to authenticate the push
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
