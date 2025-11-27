@@ -21,6 +21,13 @@ jobs:
         git config --global user.name "github-actions"
         git config --global user.email "github-actions@github.com"
 
+    - name: Print current directory
+      run: |
+        echo "Current working directory:"
+        pwd  # Show the current directory to confirm we're at the root of the repo
+        echo "Listing files in current directory:"
+        ls -la  # List files at the root of the repository
+
     - name: Organize files in a specific folder
       run: |
         # Get the folder name input from the user
@@ -31,18 +38,30 @@ jobs:
         # Create subfolders inside the target folder if they don't exist
         mkdir -p "$TARGET_FOLDER/Technical_Design" "$TARGET_FOLDER/Functional_Design" "$TARGET_FOLDER/Scripts" "$TARGET_FOLDER/CMA"
         
+        # Debug: Verify the contents of the target folder before moving files
+        echo "Listing contents of $TARGET_FOLDER before moving files:"
+        ls "$TARGET_FOLDER"
+        
         # Move files based on the filename patterns inside the specified folder
         echo "Moving TD files"
-        mv $(find "$TARGET_FOLDER" -type f -name '*TD*') "$TARGET_FOLDER/Technical_Design/" || true
+        files=$(find "$TARGET_FOLDER" -type f -name '*TD*')
+        echo "Found TD files: $files"
+        mv $files "$TARGET_FOLDER/Technical_Design/" || true
         
         echo "Moving FD files"
-        mv $(find "$TARGET_FOLDER" -type f -name '*FD*') "$TARGET_FOLDER/Functional_Design/" || true
+        files=$(find "$TARGET_FOLDER" -type f -name '*FD*')
+        echo "Found FD files: $files"
+        mv $files "$TARGET_FOLDER/Functional_Design/" || true
         
         echo "Moving cm* files"
-        mv $(find "$TARGET_FOLDER" -type f -name 'cm*') "$TARGET_FOLDER/Scripts/" || true
+        files=$(find "$TARGET_FOLDER" -type f -name 'cm*')
+        echo "Found cm* files: $files"
+        mv $files "$TARGET_FOLDER/Scripts/" || true
         
         echo "Moving .cma files"
-        mv $(find "$TARGET_FOLDER" -type f -name '*.cma') "$TARGET_FOLDER/CMA/" || true
+        files=$(find "$TARGET_FOLDER" -type f -name '*.cma')
+        echo "Found .cma files: $files"
+        mv $files "$TARGET_FOLDER/CMA/" || true
 
     - name: Debug the directory contents
       run: |
@@ -62,6 +81,7 @@ jobs:
     - name: Commit and push changes
       run: |
         # Use relative paths from the repository root for git add
+        echo "Adding files to Git:"
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
         # Commit the changes if there are any
