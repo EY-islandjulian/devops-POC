@@ -39,8 +39,8 @@ jobs:
 
     - name: Commit and push changes
       run: |
-        # Add all changes to git (corrected paths relative to the root of the repository)
-        git add "$TARGET_FOLDER/Technical_Design" "$TARGET_FOLDER/Functional_Design" "$TARGET_FOLDER/Scripts" "$TARGET_FOLDER/CMA"
+        # Use relative paths from the repository root for git add
+        git add "./$TARGET_FOLDER/Technical_Design" "./$TARGET_FOLDER/Functional_Design" "./$TARGET_FOLDER/Scripts" "./$TARGET_FOLDER/CMA"
         
         # Commit the changes
         git commit -m "Organized files in $TARGET_FOLDER"
