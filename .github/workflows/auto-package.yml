@@ -11,6 +11,8 @@ on:
 jobs:
   organize-files:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Grant write access to the repository contents
     env:
       # Set TARGET_FOLDER as an environment variable for the entire job
       TARGET_FOLDER: ${{ github.event.inputs.folder_name }}
