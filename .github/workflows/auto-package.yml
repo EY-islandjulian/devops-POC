@@ -100,8 +100,8 @@ jobs:
         # Stage the deletions so Git tracks them
         echo "Staging deleted files"
         
-        # Stage deleted files in the root directory
-        git rm -f "$TARGET_FOLDER"/*  # This removes files in the root folder that are no longer needed
+        # Stage the files that were deleted (root folder files, not subfolder)
+        git rm -f "$TARGET_FOLDER"/*  # This removes files in the root folder that are no longer needed, without affecting subfolders
         
         # Stage the added files in subfolders
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
