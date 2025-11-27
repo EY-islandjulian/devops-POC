@@ -1,0 +1,48 @@
+name: Automated File Organization
+
+on:
+  workflow_dispatch:
+    inputs:
+      folder_name:
+        description: 'Folder to organize'
+        required: true
+        default: 'myfolder'  # Set a default folder name, but the user can change it
+
+jobs:
+  organize-files:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Organize files in a specific folder
+      run: |
+        # Get the folder name input from the user
+        TARGET_FOLDER="${{ github.event.inputs.folder_name }}"
+        
+        echo "Organizing files in folder: $TARGET_FOLDER"
+        
+        # Create subfolders inside the target folder if they don't exist
+        mkdir -p "$TARGET_FOLDER/Technical_Design" "$TARGET_FOLDER/Functional_Design" "$TARGET_FOLDER/Scripts" "$TARGET_FOLDER/CMA"
+        
+        # Move files based on the filename patterns inside the specified folder
+        mv $(find "$TARGET_FOLDER" -type f -name '*TD*') "$TARGET_FOLDER/Technical_Design/" || true
+        mv $(find "$TARGET_FOLDER" -type f -name '*FD*') "$TARGET_FOLDER/Functional_Design/" || true
+        mv $(find "$TARGET_FOLDER" -type f -name 'cm*') "$TARGET_FOLDER/Scripts/" || true
+        mv $(find "$TARGET_FOLDER" -type f -name '*.cma') "$TARGET_FOLDER/CMA/" || true
+
+    - name: List organized files in specific folder
+      run: |
+        # List the contents of the subfolders in the target folder for confirmation
+        echo "Files in $TARGET_FOLDER/Technical_Design:"
+        ls "$TARGET_FOLDER/Technical_Design/"
+        
+        echo "Files in $TARGET_FOLDER/Functional_Design:"
+        ls "$TARGET_FOLDER/Functional_Design/"
+        
+        echo "Files in $TARGET_FOLDER/Scripts:"
+        ls "$TARGET_FOLDER/Scripts/"
+        
+        echo "Files in $TARGET_FOLDER/CMA:"
+        ls "$TARGET_FOLDER/CMA/"
