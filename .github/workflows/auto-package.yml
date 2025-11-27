@@ -14,7 +14,6 @@ jobs:
     permissions:
       contents: write  # Grant write access to the repository contents
     env:
-      # Set TARGET_FOLDER as an environment variable for the entire job
       TARGET_FOLDER: ${{ github.event.inputs.folder_name }}
 
     steps:
@@ -65,6 +64,14 @@ jobs:
         echo "Found .cma files: $files"
         mv $files "$TARGET_FOLDER/CMA/" || { echo "Error moving .cma files"; exit 1; }
 
+    - name: Cleanup unorganized files
+      run: |
+        # Delete files that are left in the root of the TARGET_FOLDER
+        echo "Cleaning up unorganized files in $TARGET_FOLDER"
+        
+        # Find all files that are still in the root of the target folder and delete them
+        find "$TARGET_FOLDER" -maxdepth 1 -type f -exec rm -f {} \;
+
     - name: Debug the directory contents
       run: |
         # List the files in the subfolders to ensure files were moved successfully
@@ -87,10 +94,10 @@ jobs:
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
         # Commit the changes if there are any
-        git commit -m "Organized files in $TARGET_FOLDER" || echo "No changes to commit"
+        git commit -m "Packaging $TARGET_FOLDER" || echo "No changes to commit"
         
         # Push the changes to the repository
-        git push origin HEAD:develop  # Push to the main branch (change this if you're using a different branch)
+        git push origin HEAD:develop  # Push to the develop branch (adjust if using a different branch)
       env:
         # GitHub token is automatically provided to authenticate the push
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
