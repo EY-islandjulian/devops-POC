@@ -11,6 +11,9 @@ on:
 jobs:
   organize-files:
     runs-on: ubuntu-latest
+    env:
+      # Set TARGET_FOLDER as an environment variable for the entire job
+      TARGET_FOLDER: ${{ github.event.inputs.folder_name }}
 
     steps:
     - name: Checkout repository
@@ -30,9 +33,6 @@ jobs:
 
     - name: Organize files in a specific folder
       run: |
-        # Get the folder name input from the user
-        TARGET_FOLDER="${{ github.event.inputs.folder_name }}"
-        
         echo "Organizing files in folder: $TARGET_FOLDER"
         
         # Create subfolders inside the target folder if they don't exist
@@ -46,25 +46,21 @@ jobs:
         echo "Moving TD files"
         files=$(find "$TARGET_FOLDER" -type f -name '*TD*')
         echo "Found TD files: $files"
-        echo "Moving files to $TARGET_FOLDER/Technical_Design/"
         mv $files "$TARGET_FOLDER/Technical_Design/" || { echo "Error moving TD files"; exit 1; }
         
         echo "Moving FD files"
         files=$(find "$TARGET_FOLDER" -type f -name '*FD*')
         echo "Found FD files: $files"
-        echo "Moving files to $TARGET_FOLDER/Functional_Design/"
         mv $files "$TARGET_FOLDER/Functional_Design/" || { echo "Error moving FD files"; exit 1; }
         
         echo "Moving cm* files"
         files=$(find "$TARGET_FOLDER" -type f -name 'cm*')
         echo "Found cm* files: $files"
-        echo "Moving files to $TARGET_FOLDER/Scripts/"
         mv $files "$TARGET_FOLDER/Scripts/" || { echo "Error moving cm* files"; exit 1; }
         
         echo "Moving .cma files"
         files=$(find "$TARGET_FOLDER" -type f -name '*.cma')
         echo "Found .cma files: $files"
-        echo "Moving files to $TARGET_FOLDER/CMA/"
         mv $files "$TARGET_FOLDER/CMA/" || { echo "Error moving .cma files"; exit 1; }
 
     - name: Debug the directory contents
