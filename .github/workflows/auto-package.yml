@@ -6,7 +6,7 @@ on:
       folder_name:
         description: 'Folder to organize'
         required: true
-        default: 'myfolder'  # Set a default folder name, but the user can change it
+        default: 'myfolder'  # Default folder name, can be overridden by user input
 
 jobs:
   organize-files:
@@ -15,6 +15,11 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+
+    - name: Set up Git user
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
 
     - name: Organize files in a specific folder
       run: |
@@ -31,6 +36,20 @@ jobs:
         mv $(find "$TARGET_FOLDER" -type f -name '*FD*') "$TARGET_FOLDER/Functional_Design/" || true
         mv $(find "$TARGET_FOLDER" -type f -name 'cm*') "$TARGET_FOLDER/Scripts/" || true
         mv $(find "$TARGET_FOLDER" -type f -name '*.cma') "$TARGET_FOLDER/CMA/" || true
+
+    - name: Commit and push changes
+      run: |
+        # Add all changes to git
+        git add "$TARGET_FOLDER/Technical_Design" "$TARGET_FOLDER/Functional_Design" "$TARGET_FOLDER/Scripts" "$TARGET_FOLDER/CMA"
+        
+        # Commit the changes
+        git commit -m "Organized files in $TARGET_FOLDER"
+        
+        # Push the changes to the repository
+        git push origin HEAD:main  # Push to the main branch (change this if you're using a different branch)
+      env:
+        # GitHub token is automatically provided to authenticate the push
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: List organized files in specific folder
       run: |
