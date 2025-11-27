@@ -61,7 +61,7 @@ jobs:
 
     - name: Commit and push changes
       run: |
-        # Add all changes to git (only if files were moved)
+        # Use relative paths from the repository root for git add
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
         # Commit the changes if there are any
