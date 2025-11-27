@@ -43,26 +43,69 @@ jobs:
         echo "Listing contents of $TARGET_FOLDER before moving files:"
         ls "$TARGET_FOLDER"
         
-        # Move files based on the filename patterns inside the specified folder
+        # Move TD files
         echo "Moving TD files"
         files=$(find "$TARGET_FOLDER" -type f -name '*TD*')
         echo "Found TD files: $files"
-        mv $files "$TARGET_FOLDER/Technical_Design/" || { echo "Error moving TD files"; exit 1; }
         
+        for file in $files; do
+          # Check if the file already exists in the target subfolder
+          if [ -f "$TARGET_FOLDER/Technical_Design/$(basename $file)" ]; then
+            echo "File $(basename $file) exists in Technical_Design. Replacing it."
+            mv -f "$file" "$TARGET_FOLDER/Technical_Design/"  # Replace the existing file
+          else
+            echo "File $(basename $file) does not exist in Technical_Design. Moving it."
+            mv "$file" "$TARGET_FOLDER/Technical_Design/"  # Move the new file
+          fi
+        done
+
+        # Move FD files
         echo "Moving FD files"
         files=$(find "$TARGET_FOLDER" -type f -name '*FD*')
         echo "Found FD files: $files"
-        mv $files "$TARGET_FOLDER/Functional_Design/" || { echo "Error moving FD files"; exit 1; }
         
+        for file in $files; do
+          # Check if the file already exists in the target subfolder
+          if [ -f "$TARGET_FOLDER/Functional_Design/$(basename $file)" ]; then
+            echo "File $(basename $file) exists in Functional_Design. Replacing it."
+            mv -f "$file" "$TARGET_FOLDER/Functional_Design/"  # Replace the existing file
+          else
+            echo "File $(basename $file) does not exist in Functional_Design. Moving it."
+            mv "$file" "$TARGET_FOLDER/Functional_Design/"  # Move the new file
+          fi
+        done
+
+        # Move cm* files
         echo "Moving cm* files"
         files=$(find "$TARGET_FOLDER" -type f -name 'cm*')
         echo "Found cm* files: $files"
-        mv $files "$TARGET_FOLDER/Scripts/" || { echo "Error moving cm* files"; exit 1; }
         
+        for file in $files; do
+          # Check if the file already exists in the target subfolder
+          if [ -f "$TARGET_FOLDER/Scripts/$(basename $file)" ]; then
+            echo "File $(basename $file) exists in Scripts. Replacing it."
+            mv -f "$file" "$TARGET_FOLDER/Scripts/"  # Replace the existing file
+          else
+            echo "File $(basename $file) does not exist in Scripts. Moving it."
+            mv "$file" "$TARGET_FOLDER/Scripts/"  # Move the new file
+          fi
+        done
+
+        # Move .cma files
         echo "Moving .cma files"
         files=$(find "$TARGET_FOLDER" -type f -name '*.cma')
         echo "Found .cma files: $files"
-        mv $files "$TARGET_FOLDER/CMA/" || { echo "Error moving .cma files"; exit 1; }
+        
+        for file in $files; do
+          # Check if the file already exists in the target subfolder
+          if [ -f "$TARGET_FOLDER/CMA/$(basename $file)" ]; then
+            echo "File $(basename $file) exists in CMA. Replacing it."
+            mv -f "$file" "$TARGET_FOLDER/CMA/"  # Replace the existing file
+          else
+            echo "File $(basename $file) does not exist in CMA. Moving it."
+            mv "$file" "$TARGET_FOLDER/CMA/"  # Move the new file
+          fi
+        done
 
     - name: Cleanup unorganized files
       run: |
@@ -94,10 +137,10 @@ jobs:
         git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
         # Commit the changes if there are any
-        git commit -m "Packaging $TARGET_FOLDER" || echo "No changes to commit"
+        git commit -m "Organized files in $TARGET_FOLDER" || echo "No changes to commit"
         
         # Push the changes to the repository
-        git push origin HEAD:develop  # Push to the develop branch (adjust if using a different branch)
+        git push origin HEAD:develop  # Push to the main branch (adjust if using a different branch)
       env:
         # GitHub token is automatically provided to authenticate the push
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
