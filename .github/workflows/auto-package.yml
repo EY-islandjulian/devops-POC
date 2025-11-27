@@ -49,14 +49,9 @@ jobs:
         echo "Found TD files: $files"
         
         for file in $files; do
-          # Check if the file already exists in the target subfolder
-          if [ -f "$TARGET_FOLDER/Technical_Design/$(basename $file)" ]; then
-            echo "File $(basename $file) exists in Technical_Design. Replacing it."
-            mv -f "$file" "$TARGET_FOLDER/Technical_Design/"  # Replace the existing file
-          else
-            echo "File $(basename $file) does not exist in Technical_Design. Moving it."
-            mv "$file" "$TARGET_FOLDER/Technical_Design/"  # Move the new file
-          fi
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to Technical_Design"
+          mv -f "$file" "$TARGET_FOLDER/Technical_Design/"  # Use mv (move), -f to overwrite if exists
         done
 
         # Move FD files that are not in subfolders
@@ -65,14 +60,9 @@ jobs:
         echo "Found FD files: $files"
         
         for file in $files; do
-          # Check if the file already exists in the target subfolder
-          if [ -f "$TARGET_FOLDER/Functional_Design/$(basename $file)" ]; then
-            echo "File $(basename $file) exists in Functional_Design. Replacing it."
-            mv -f "$file" "$TARGET_FOLDER/Functional_Design/"  # Replace the existing file
-          else
-            echo "File $(basename $file) does not exist in Functional_Design. Moving it."
-            mv "$file" "$TARGET_FOLDER/Functional_Design/"  # Move the new file
-          fi
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to Functional_Design"
+          mv -f "$file" "$TARGET_FOLDER/Functional_Design/"  # Use mv (move), -f to overwrite if exists
         done
 
         # Move cm* files that are not in subfolders
@@ -81,14 +71,9 @@ jobs:
         echo "Found cm* files: $files"
         
         for file in $files; do
-          # Check if the file already exists in the target subfolder
-          if [ -f "$TARGET_FOLDER/Scripts/$(basename $file)" ]; then
-            echo "File $(basename $file) exists in Scripts. Replacing it."
-            mv -f "$file" "$TARGET_FOLDER/Scripts/"  # Replace the existing file
-          else
-            echo "File $(basename $file) does not exist in Scripts. Moving it."
-            mv "$file" "$TARGET_FOLDER/Scripts/"  # Move the new file
-          fi
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to Scripts"
+          mv -f "$file" "$TARGET_FOLDER/Scripts/"  # Use mv (move), -f to overwrite if exists
         done
 
         # Move .cma files that are not in subfolders
@@ -97,23 +82,18 @@ jobs:
         echo "Found .cma files: $files"
         
         for file in $files; do
-          # Check if the file already exists in the target subfolder
-          if [ -f "$TARGET_FOLDER/CMA/$(basename $file)" ]; then
-            echo "File $(basename $file) exists in CMA. Replacing it."
-            mv -f "$file" "$TARGET_FOLDER/CMA/"  # Replace the existing file
-          else
-            echo "File $(basename $file) does not exist in CMA. Moving it."
-            mv "$file" "$TARGET_FOLDER/CMA/"  # Move the new file
-          fi
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to CMA"
+          mv -f "$file" "$TARGET_FOLDER/CMA/"  # Use mv (move), -f to overwrite if exists
         done
 
     - name: Cleanup unorganized files
       run: |
-        # Delete files that are left in the root of the TARGET_FOLDER
+        # Delete any files that are left in the root of the TARGET_FOLDER
         echo "Cleaning up unorganized files in $TARGET_FOLDER"
         
-        # Find all files that are still in the root of the target folder and delete them
-        find "$TARGET_FOLDER" -maxdepth 1 -type f -exec rm -f {} \;
+        # Find and delete files only in the root directory (not in subfolders)
+        find "$TARGET_FOLDER" -maxdepth 1 -type f ! -name 'Technical_Design/*' ! -name 'Functional_Design/*' ! -name 'Scripts/*' ! -name 'CMA/*' -exec rm -f {} \;
 
     - name: Debug the directory contents
       run: |
