@@ -45,7 +45,7 @@ jobs:
         
         # Move TD files that are not in subfolders
         echo "Moving TD files"
-        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*TD*')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*TD*' -not -path "$TARGET_FOLDER/Technical_Design/*")
         echo "Found TD files: $files"
         
         for file in $files; do
@@ -56,7 +56,7 @@ jobs:
 
         # Move FD files that are not in subfolders
         echo "Moving FD files"
-        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*FD*')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*FD*' -not -path "$TARGET_FOLDER/Functional_Design/*")
         echo "Found FD files: $files"
         
         for file in $files; do
@@ -67,7 +67,7 @@ jobs:
 
         # Move cm* files that are not in subfolders
         echo "Moving cm* files"
-        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name 'cm*')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name 'cm*' -not -path "$TARGET_FOLDER/Scripts/*")
         echo "Found cm* files: $files"
         
         for file in $files; do
@@ -78,7 +78,7 @@ jobs:
 
         # Move .cma files that are not in subfolders
         echo "Moving .cma files"
-        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*.cma')
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*.cma' -not -path "$TARGET_FOLDER/CMA/*")
         echo "Found .cma files: $files"
         
         for file in $files; do
@@ -89,10 +89,10 @@ jobs:
 
     - name: Cleanup unorganized files
       run: |
-        # Delete any files that are left in the root of the TARGET_FOLDER
+        # Delete any files that have been moved and are no longer needed in the root
         echo "Cleaning up unorganized files in $TARGET_FOLDER"
         
-        # Find and delete files only in the root directory (not in subfolders)
+        # Find and delete files only in the root directory that are not in subfolders
         find "$TARGET_FOLDER" -maxdepth 1 -type f ! -name 'Technical_Design/*' ! -name 'Functional_Design/*' ! -name 'Scripts/*' ! -name 'CMA/*' -exec rm -f {} \;
 
     - name: Debug the directory contents
