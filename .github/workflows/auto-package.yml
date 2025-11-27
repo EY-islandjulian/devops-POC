@@ -32,28 +32,50 @@ jobs:
         mkdir -p "$TARGET_FOLDER/Technical_Design" "$TARGET_FOLDER/Functional_Design" "$TARGET_FOLDER/Scripts" "$TARGET_FOLDER/CMA"
         
         # Move files based on the filename patterns inside the specified folder
+        echo "Moving TD files"
         mv $(find "$TARGET_FOLDER" -type f -name '*TD*') "$TARGET_FOLDER/Technical_Design/" || true
+        
+        echo "Moving FD files"
         mv $(find "$TARGET_FOLDER" -type f -name '*FD*') "$TARGET_FOLDER/Functional_Design/" || true
+        
+        echo "Moving cm* files"
         mv $(find "$TARGET_FOLDER" -type f -name 'cm*') "$TARGET_FOLDER/Scripts/" || true
+        
+        echo "Moving .cma files"
         mv $(find "$TARGET_FOLDER" -type f -name '*.cma') "$TARGET_FOLDER/CMA/" || true
+
+    - name: Debug the directory contents
+      run: |
+        # List the files in the subfolders to ensure files were moved successfully
+        echo "Listing files in $TARGET_FOLDER/Technical_Design:"
+        ls "$TARGET_FOLDER/Technical_Design/"
+        
+        echo "Listing files in $TARGET_FOLDER/Functional_Design:"
+        ls "$TARGET_FOLDER/Functional_Design/"
+        
+        echo "Listing files in $TARGET_FOLDER/Scripts:"
+        ls "$TARGET_FOLDER/Scripts/"
+        
+        echo "Listing files in $TARGET_FOLDER/CMA:"
+        ls "$TARGET_FOLDER/CMA/"
 
     - name: Commit and push changes
       run: |
-        # Use relative paths from the repository root for git add
-        git add "./$TARGET_FOLDER/Technical_Design" "./$TARGET_FOLDER/Functional_Design" "./$TARGET_FOLDER/Scripts" "./$TARGET_FOLDER/CMA"
+        # Add all changes to git (only if files were moved)
+        git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
         
-        # Commit the changes
-        git commit -m "Organized files in $TARGET_FOLDER"
+        # Commit the changes if there are any
+        git commit -m "Organized files in $TARGET_FOLDER" || echo "No changes to commit"
         
         # Push the changes to the repository
-        git push origin HEAD:develop  # Push to the main branch (change this if you're using a different branch)
+        git push origin HEAD:main  # Push to the main branch (change this if you're using a different branch)
       env:
         # GitHub token is automatically provided to authenticate the push
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: List organized files in specific folder
+    - name: List organized files in specific folder (Final Check)
       run: |
-        # List the contents of the subfolders in the target folder for confirmation
+        # List the contents of the subfolders in the target folder after the commit
         echo "Files in $TARGET_FOLDER/Technical_Design:"
         ls "$TARGET_FOLDER/Technical_Design/"
         
