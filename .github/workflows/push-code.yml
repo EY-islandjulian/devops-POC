@@ -1,0 +1,91 @@
+name: Push Release Folder to PKG Branch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Ensure the bot has write permissions to the repository
+  actions: read    # Allows actions to read metadata
+
+jobs:
+
+  sync-release-folder:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Extract folder name from Release Title
+
+        id: vars
+
+        run: echo "FOLDER_NAME=${{ EXT-001.CodeConfig }}" >> $GITHUB_ENV
+
+      - name: Checkout develop
+
+        uses: actions/checkout@v4
+
+        with:
+
+          ref: develop
+
+          fetch-depth: 0
+
+      - name: Verify folder exists
+
+        run: |
+
+          echo "Looking for folder: $FOLDER_NAME"
+
+          if [ ! -d "$FOLDER_NAME" ]; then
+
+            echo "❌ Folder $FOLDER_NAME not found in develop branch."
+
+            exit 1
+
+          fi
+
+      - name: Copy the folder to temp
+
+        run: |
+
+          rm -rf sync-folder
+
+          mkdir sync-folder
+
+          cp -R "$FOLDER_NAME" sync-folder/
+
+      - name: Checkout PKG branch
+
+        uses: actions/checkout@v4
+
+        with:
+
+          ref: PKG
+
+          fetch-depth: 0
+
+      - name: Copy folder into PKG
+
+        run: |
+
+          rm -rf "$FOLDER_NAME"
+
+          mkdir -p "$FOLDER_NAME"
+
+          cp -R sync-folder/* "$FOLDER_NAME"
+
+      - name: Commit & Push to PKG
+
+        run: |
+
+          git config --global user.name "github-actions"
+
+          git config --global user.email "github-actions@github.com"
+
+          git add "$FOLDER_NAME"
+
+          git commit -m "Auto-sync folder '$FOLDER_NAME' from develop to PKG after release" || echo "No changes to commit"
+
+          git push origin PKG
+ 
