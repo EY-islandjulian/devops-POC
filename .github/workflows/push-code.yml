@@ -19,7 +19,7 @@ jobs:
 
         id: vars
 
-        run: echo "FOLDER_NAME=${{ EXT-001.CodeConfig }}" >> $GITHUB_ENV
+        run: echo "FOLDER_NAME=EXT-001.CodeConfig" >> $GITHUB_ENV
 
       - name: Checkout develop
 
