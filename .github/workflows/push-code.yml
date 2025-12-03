@@ -8,26 +8,33 @@ jobs:
  sync-release-folder:
    runs-on: ubuntu-latest
    steps:
-     - name: Set folder name manually for now
+     - name: Set folder name
        run: echo "FOLDER_NAME=EXT-001.CodeConfig" >> $GITHUB_ENV
      - name: Checkout develop branch
        uses: actions/checkout@v4
        with:
          ref: develop
-         fetch-depth: 0
+         fetch-depth: 0  # ensures full repo
+     - name: DEBUG - List develop branch
+       run: |
+         echo "=== ROOT OF DEVELOP ==="
+         ls -la
+         echo "=== CHECK FOLDER ==="
+         ls -la "$FOLDER_NAME" || echo "❌ Folder not found at root!"
      - name: Verify folder exists
        run: |
-         echo "Looking for folder: '$FOLDER_NAME'"
          if [ ! -d "$FOLDER_NAME" ]; then
            echo "❌ ERROR: Folder '$FOLDER_NAME' not found in develop"
            exit 1
          fi
-     - name: Copy folder into temp
+     - name: Copy folder to temp
        run: |
          rm -rf sync-folder
          mkdir -p sync-folder
-         echo "Copying develop/$FOLDER_NAME → sync-folder/"
-         cp -a "$FOLDER_NAME"/. sync-folder/ || echo "⚠️ Folder is empty — continuing"
+         echo "Copying $FOLDER_NAME → sync-folder"
+         cp -a "$FOLDER_NAME"/. sync-folder/ || true
+         echo "=== TEMP FOLDER CONTENTS ==="
+         ls -la sync-folder || echo "❌ Temp still empty!"
      - name: Checkout PKG branch
        uses: actions/checkout@v4
        with:
@@ -35,11 +42,13 @@ jobs:
          fetch-depth: 0
      - name: Copy into PKG branch
        run: |
-         echo "Replacing PKG/$FOLDER_NAME with new contents"
          rm -rf "$FOLDER_NAME"
          mkdir -p "$FOLDER_NAME"
-         cp -a sync-folder/. "$FOLDER_NAME"/ || echo "⚠️ Temp folder empty — nothing to copy"
-     - name: Commit & push
+         echo "Copying sync-folder → $FOLDER_NAME"
+         cp -a sync-folder/. "$FOLDER_NAME"/ || true
+         echo "=== PKG TARGET CONTENTS ==="
+         ls -la "$FOLDER_NAME"
+     - name: Commit & Push
        run: |
          git config --global user.name "github-actions"
          git config --global user.email "github-actions@github.com"
