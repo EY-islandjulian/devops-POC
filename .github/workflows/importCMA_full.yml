@@ -1,0 +1,175 @@
+name: Promote, Deploy CMA, and Run CCS Batch Job
+on:
+ workflow_dispatch:
+   inputs:
+     release_tag:
+       description: "Release tag (Format: v1.0.0-FOLDERNAME)"
+       required: true
+       type: string
+     target_env:
+       description: "Target environment"
+       required: true
+       type: choice
+       options:
+         - C2MDEV
+         - C2MTEST
+       default: C2MDEV
+permissions:
+ contents: write
+ actions: read
+jobs:
+ promote-and-upload:
+   runs-on: self-hosted
+   timeout-minutes: 60
+   outputs:
+     TARGET_ENV: ${{ steps.resolve_env.outputs.TARGET_ENV }}
+     CMA_FOLDER: ${{ steps.extract_cma.outputs.CMA_FOLDER }}
+   steps:
+     - name: Checkout repository
+       uses: actions/checkout@v4
+       with:
+         fetch-depth: 0
+     - name: Resolve inputs
+       id: resolve_env
+       shell: pwsh
+       run: |
+         "TARGET_ENV=${{ inputs.target_env }}" | Out-File $env:GITHUB_ENV -Append
+         "TARGET_ENV=${{ inputs.target_env }}" | Out-File $env:GITHUB_OUTPUT -Append
+     - name: Extract CMA folder
+       id: extract_cma
+       shell: pwsh
+       run: |
+         $parts = "${{ inputs.release_tag }}".Split("-", 2)
+         if ($parts.Length -lt 2) {
+           Write-Error "Invalid release tag format"
+           exit 1
+         }
+         "CMA_FOLDER=$($parts[1])" | Out-File $env:GITHUB_ENV -Append
+         "CMA_FOLDER=$($parts[1])" | Out-File $env:GITHUB_OUTPUT -Append
+     - name: Determine branches
+       shell: pwsh
+       run: |
+         $sourceBranch = switch ("${{ inputs.target_env }}") {
+           "C2MDEV"  { "C2MDEV" }
+           "C2MTEST" { "C2MDEV" }
+         }
+         "SOURCE_BRANCH=$sourceBranch" | Out-File $env:GITHUB_ENV -Append
+         "TARGET_BRANCH=${{ inputs.target_env }}" | Out-File $env:GITHUB_ENV -Append
+     - name: Fetch all refs
+       run: |
+         git fetch origin $env:SOURCE_BRANCH --depth=1
+         git fetch origin --tags --force
+     - name: Create CMA ZIP artifact
+       shell: pwsh
+       run: |
+         git checkout $env:SOURCE_BRANCH
+         $folderPath = Join-Path $PWD $env:CMA_FOLDER
+         $zipName = "$env:CMA_FOLDER-${{ inputs.release_tag }}.zip"
+         if (-not (Test-Path $folderPath)) {
+           Write-Error "CMA folder not found"
+           exit 1
+         }
+         Compress-Archive -Path "$folderPath/*" -DestinationPath $zipName -Force
+         "CMA_ZIP=$zipName" | Out-File $env:GITHUB_ENV -Append
+     - name: Tag / Release management
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         git fetch origin --tags
+         if (-not (git tag -l "${{ inputs.release_tag }}")) {
+           git tag "${{ inputs.release_tag }}"
+           git push origin "${{ inputs.release_tag }}"
+         }
+         if (-not (gh release view "${{ inputs.release_tag }}" 2>$null)) {
+           gh release create "${{ inputs.release_tag }}" $env:CMA_ZIP `
+             --title "${{ inputs.release_tag }}" `
+             --notes "Automated CMA release"
+         } else {
+           gh release upload "${{ inputs.release_tag }}" $env:CMA_ZIP --clobber
+         }
+     - name: Promote CMA to target environment
+       shell: pwsh
+       run: |
+         git checkout $env:TARGET_BRANCH
+         git pull origin $env:TARGET_BRANCH
+         git checkout origin/$env:SOURCE_BRANCH -- "./$env:CMA_FOLDER"
+         git config user.name "github-actions"
+         git config user.email "github-actions@github.com"
+         git add $env:CMA_FOLDER
+         git commit -m "Promote CMA $env:CMA_FOLDER (${{ inputs.release_tag }})" `
+           || Write-Host "Nothing to commit"
+         git push origin $env:TARGET_BRANCH
+ deploy-and-run:
+   needs: promote-and-upload
+   runs-on: self-hosted
+   timeout-minutes: 45
+   env:
+     TARGET_ENV: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
+     CMA_FOLDER: ${{ needs.promote-and-upload.outputs.CMA_FOLDER }}
+   steps:
+     - name: Checkout TARGET_ENV branch
+       uses: actions/checkout@v4
+       with:
+         ref: ${{ env.TARGET_ENV }}
+     - name: Locate CMA file
+       id: cma
+       shell: pwsh
+       run: |
+         $path = "$PWD\$env:CMA_FOLDER\CMA"
+         $file = Get-ChildItem $path -Filter "*.cma" | Select-Object -First 1
+         if (-not $file) { exit 1 }
+         echo "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
+     - name: Copy CMA to import directory
+       shell: pwsh
+       run: |
+         $source = Get-ChildItem -Recurse -Filter "${{ steps.cma.outputs.cmafile }}" | Select-Object -First 1
+         $dest = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
+         if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest }
+         Copy-Item $source.FullName $dest -Force
+     - name: Load environment-specific secrets
+       shell: pwsh
+       run: |
+         if ($env:TARGET_ENV -eq "C2MDEV") {
+           "USERNAME=${{ secrets.C2MDEV_USER }}" | Out-File $env:GITHUB_ENV -Append
+           "PASSWORD=${{ secrets.C2MDEV_PASS }}" | Out-File $env:GITHUB_ENV -Append
+           "MIGRATION_API=${{ secrets.C2MDEV_API }}" | Out-File $env:GITHUB_ENV -Append
+           "CCS_HOST=${{ secrets.C2MDEV_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+         } else {
+           "USERNAME=${{ secrets.C2MTEST_USER }}" | Out-File $env:GITHUB_ENV -Append
+           "PASSWORD=${{ secrets.C2MTEST_PASS }}" | Out-File $env:GITHUB_ENV -Append
+           "MIGRATION_API=${{ secrets.C2MTEST_API }}" | Out-File $env:GITHUB_ENV -Append
+           "CCS_HOST=${{ secrets.C2MTEST_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+         }
+     - name: Run Migration Script
+       run: |
+         pwsh ./run-migration.ps1 `
+           -Username "$env:USERNAME" `
+           -Password "$env:PASSWORD" `
+           -MigrationApi "$env:MIGRATION_API" `
+           -CmaFile "${{ steps.cma.outputs.cmafile }}"
+     - name: Run CCS Batch Job
+       shell: pwsh
+       run: |
+         $auth = [Convert]::ToBase64String(
+           [Text.Encoding]::UTF8.GetBytes("$env:USERNAME`:$env:PASSWORD")
+         )
+         Invoke-RestMethod `
+           -Method Post `
+           -Uri "$env:CCS_HOST/ccs/rest/apis/common/batch/batchJobSubmission/" `
+           -Headers @{
+             Authorization = "Basic $auth"
+             "Content-Type" = "application/json"
+             accept = "application/json"
+           } `
+           -Body (@{
+             F1SubmitJob = @{
+               jobDetails = @{ batchControl = "F1-MGOPR" }
+             }
+           } | ConvertTo-Json -Depth 5
+     - name: Mark deployment SUCCESS
+       if: success()
+       run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
+     - name: Mark deployment FAILED
+       if: failure()
+       run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
