@@ -1,0 +1,81 @@
+name: Run Oracle CCS Batch Job
+on:
+ workflow_dispatch:
+   inputs:
+     targetEnv:
+       description: "Target Environment"
+       required: true
+       type: choice
+       options:
+         - CCSDEV
+         - CCSTEST
+     batchControl:
+       description: "Batch Control Name (e.g. F1-FLUSH)"
+       required: true
+       type: string
+       default: F1-MGOPR
+jobs:
+ run-ccs-batch-job:
+   runs-on: ubuntu-latest
+   steps:
+     - name: Resolve environment secrets
+       id: resolve
+       shell: pwsh
+       run: |
+         if ("${{ github.event.inputs.targetEnv }}" -eq "CCSDEV") {
+           "CCS_HOST=${{ secrets.CCSDEV_BATCH_HOSTNAME }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+           "CCS_USER=${{ secrets.H2OA_CCSDEV_USER }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+           "CCS_PASS=${{ secrets.H2OA_CCSDEV_PASS }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+         }
+         elseif ("${{ github.event.inputs.targetEnv }}" -eq "CCSTEST") {
+           "CCS_HOST=${{ secrets.CCSTEST01_BATCH_HOSTNAME }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+           "CCS_USER=${{ secrets.H2OA_CCSTEST01_USER }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+           "CCS_PASS=${{ secrets.H2OA_CCSTEST01_PASS }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+         }
+         else {
+           Write-Error "Unsupported environment"
+           exit 1
+         }
+     - name: Submit CCS Batch Job
+       shell: pwsh
+       run: |
+         Write-Host "Starting Oracle CCS batch job submission..."
+         $batchControl = "${{ github.event.inputs.batchControl }}"
+         $ccsHost      = "$env:CCS_HOST"
+         $username     = "$env:CCS_USER"
+         $password     = "$env:CCS_PASS"
+         Write-Host "Batch Control: $batchControl"
+         Write-Host "Target Host: $ccsHost"
+         # ---- Build Basic Auth Header ----
+         $pair        = "$username`:$password"
+         $bytes       = [System.Text.Encoding]::UTF8.GetBytes($pair)
+         $encodedAuth = [Convert]::ToBase64String($bytes)
+         $authHeader  = "Basic $encodedAuth"
+         $uri = "$ccsHost/ccs/rest/apis/common/batch/batchJobSubmission/"
+         $headers = @{
+           "accept"        = "application/json"
+           "Authorization" = $authHeader
+           "Content-Type"  = "application/json"
+         }
+         $body = @{
+           F1SubmitJob = @{
+             jobDetails = @{
+               batchControl = $batchControl
+             }
+           }
+         } | ConvertTo-Json -Depth 5
+         try {
+           $response = Invoke-RestMethod `
+             -Method Post `
+             -Uri $uri `
+             -Headers $headers `
+             -Body $body `
+             -ErrorAction Stop
+           Write-Host "Batch job submitted successfully."
+           $response | ConvertTo-Json -Depth 10
+         }
+         catch {
+           Write-Error "Batch job submission failed!"
+           Write-Error $_
+           exit 1
+         }
