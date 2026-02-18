@@ -1,7 +1,7 @@
 param(
    [string]$Username,
    [string]$Password,
-   [string]$MigrationApiBaseUrl,   # e.g. https://<host>/migration
+   [string]$MigrationApi,   # e.g. https://<host>/migration
    [string]$CmaFile,               # CMA filename already stored in OSS
    # OPTIONAL – only passed for CCSDEV
    [string]$ShouldAutoApply,
@@ -11,7 +11,7 @@ param(
 try {
    Write-Host "Starting CMA migration..."
    Write-Host "Username: $Username"
-   Write-Host "API Base URL: $MigrationApiBaseUrl"
+   Write-Host "API Base URL: $MigrationApi"
    Write-Host "CMA file: $CmaFile"
    # Build Basic Auth header
    $pair = "$Username`:$Password"
@@ -40,7 +40,7 @@ try {
    $body = @($importPayload) | ConvertTo-Json
    # DEBUG: Show exactly what we’re sending
    Write-Host "POST BODY:" $body
-   $importUri = "$($MigrationApiBaseUrl.TrimEnd('/'))/addImport"
+   $importUri = "$($MigrationApi.TrimEnd('/'))/addImport"
    $response = Invoke-RestMethod `
        -Uri $importUri `
        -Method Post `
@@ -53,7 +53,7 @@ try {
    if (-not $migrationDataSetId) {
        throw "migrationDataSetId not found in response."
    }
-   $statusUri = "$($MigrationApiBaseUrl.TrimEnd('/'))/$migrationDataSetId/import"
+   $statusUri = "$($MigrationApi.TrimEnd('/'))/$migrationDataSetId/import"
    $pollIntervalSeconds = 15
    $timeoutMinutes = 30
    $elapsed = 0
@@ -99,4 +99,5 @@ catch {
        }
    }
    exit 1
+
 }
