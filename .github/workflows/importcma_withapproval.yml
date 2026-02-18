@@ -71,23 +71,56 @@ jobs:
          }
          Compress-Archive -Path "$folderPath/*" -DestinationPath $zipName -Force
          "CMA_ZIP=$zipName" | Out-File $env:GITHUB_ENV -Append
-     - name: Tag / Release management
+     - name: Tag / Release management (No GH CLI)
        shell: pwsh
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         REPO_OWNER: ${{ github.repository_owner }}
+         REPO_NAME: ${{ github.repository }}
        run: |
-         git fetch origin --tags
-         if (-not (git tag -l "${{ inputs.release_tag }}")) {
+         # Ensure tag exists
+         $tagExists = git tag -l "${{ inputs.release_tag }}"
+         if (-not $tagExists) {
            git tag "${{ inputs.release_tag }}"
            git push origin "${{ inputs.release_tag }}"
          }
-         if (-not (gh release view "${{ inputs.release_tag }}" 2>$null)) {
-           gh release create "${{ inputs.release_tag }}" $env:CMA_ZIP `
-             --title "${{ inputs.release_tag }}" `
-             --notes "Automated CMA release"
-         } else {
-           gh release upload "${{ inputs.release_tag }}" $env:CMA_ZIP --clobber
+         # Check if release exists
+         $releaseUrl = "https://api.github.com/repos/$env:REPO_OWNER/$env:REPO_NAME/releases/tags/${{ inputs.release_tag }}"
+         $headers = @{ Authorization = "token $env:GH_TOKEN"; "User-Agent" = "PowerShell" }
+         try {
+           $release = Invoke-RestMethod -Uri $releaseUrl -Method Get -Headers $headers
+           $releaseId = $release.id
+         } catch {
+           $releaseId = $null
          }
+         if (-not $releaseId) {
+           # Create release
+           $body = @{
+             tag_name = "${{ inputs.release_tag }}"
+             name = "${{ inputs.release_tag }}"
+             body = "Automated CMA release"
+             draft = $false
+             prerelease = $false
+           } | ConvertTo-Json -Depth 3
+           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:REPO_OWNER/$env:REPO_NAME/releases" `
+                                        -Method Post -Headers $headers -Body $body
+           $releaseId = $release.id
+         }
+         # Upload CMA ZIP artifact to release
+         $zipPath = "$env:CMA_ZIP"
+         $assetName = [System.IO.Path]::GetFileName($zipPath)
+         $uploadUrl = $release.upload_url -replace "\{.*\}", "?name=$assetName"
+         # Delete existing asset if exists
+         try {
+           $existingAssets = Invoke-RestMethod -Uri $release.assets_url -Headers $headers
+           $existingAsset = $existingAssets | Where-Object { $_.name -eq $assetName }
+           if ($existingAsset) {
+             Invoke-RestMethod -Uri $existingAsset.url -Headers $headers -Method Delete
+           }
+         } catch { }
+         # Upload asset
+         Invoke-RestMethod -Uri $uploadUrl -Headers @{ Authorization = "token $env:GH_TOKEN"; "Content-Type"="application/zip" } `
+                           -Method Post -InFile $zipPath
      - name: Promote CMA to target environment
        shell: pwsh
        run: |
@@ -149,9 +182,9 @@ jobs:
            -MigrationApi "$env:MIGRATION_API" `
            -CmaFile "${{ steps.cma.outputs.cmafile }}"
  approval-before-ccs:
-   needs: 
-   - promote-and-upload
-   - deploy-and-run
+   needs:
+     - promote-and-upload
+     - deploy-and-run
    runs-on: self-hosted
    environment:
      name: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
@@ -181,7 +214,7 @@ jobs:
              F1SubmitJob = @{
                jobDetails = @{ batchControl = "F1-MGOPR" }
              }
-           } | ConvertTo-Json -Depth 5
+           } | ConvertTo-Json -Depth 5)
      - name: Mark deployment SUCCESS
        if: success()
        run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
