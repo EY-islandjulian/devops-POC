@@ -238,3 +238,14 @@ jobs:
      - name: Mark deployment FAILED
        if: failure()
        run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
+     - name: Update release notes
+       if: always()
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         pwsh -NoProfile -ExecutionPolicy Bypass ./update_release_notes.ps1 `
+           -ReleaseTag $env:RELEASE_TAG `
+           -TargetEnv $env:TARGET_ENV `
+           -DeployStatus $env:DEPLOY_STATUS `
+           -Repo $env:GITHUB_REPOSITORY
