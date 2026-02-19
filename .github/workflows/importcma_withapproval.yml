@@ -139,36 +139,11 @@ jobs:
    needs: promote-and-upload
    runs-on: self-hosted
    timeout-minutes: 45
-   outputs:
-     USERNAME: ${{ steps.load_secrets.outputs.USERNAME }}
-     PASSWORD: ${{ steps.load_secrets.outputs.PASSWORD }}
-     MIGRATION_API: ${{ steps.load_secrets.outputs.MIGRATION_API }}
-     BATCH_HOST: ${{ steps.load_secrets.outputs.BATCH_HOST }}
-     CMA_FILE: ${{ steps.cma.outputs.cmafile }}
    steps:
      - name: Checkout TARGET_ENV branch
        uses: actions/checkout@v4
        with:
          ref: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
-     - name: Load environment-specific secrets
-       id: load_secrets
-       shell: pwsh
-       run: |
-         if ($env:TARGET_ENV -eq "C2MDEV") {
-           $USERNAME      = $env:C2M_USER
-           $PASSWORD      = $env:C2M_PASS
-           $MIGRATION_API = $env:C2M_API_URL
-           $BATCH_HOST    = $env:C2MDEV_BATCH_HOST
-         } else {
-           $USERNAME      = $env:C2MTEST_USER
-           $PASSWORD      = $env:C2MTEST_PASS
-           $MIGRATION_API = $env:C2MTEST_API_URL
-           $BATCH_HOST    = $env:C2MTEST_BATCH_HOST
-         }
-         echo "USERNAME=$USERNAME" >> $env:GITHUB_OUTPUT
-         echo "PASSWORD=$PASSWORD" >> $env:GITHUB_OUTPUT
-         echo "MIGRATION_API=$MIGRATION_API" >> $env:GITHUB_OUTPUT
-         echo "BATCH_HOST=$BATCH_HOST" >> $env:GITHUB_OUTPUT
      - name: Locate CMA file
        id: cma
        shell: pwsh
@@ -189,8 +164,21 @@ jobs:
          if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
          if (Test-Path $destFile) { attrib -R $destFile; Remove-Item $destFile -Force }
          Copy-Item $source.FullName $destDir -Force
-     - name: Run Migration Script
+     - name: Load environment-specific secrets
        shell: pwsh
+       run: |
+         if ($env:TARGET_ENV -eq "C2MDEV") {
+           "USERNAME=${{ secrets.C2M_USER }}" | Out-File $env:GITHUB_ENV -Append
+           "PASSWORD=${{ secrets.C2M_PASS }}" | Out-File $env:GITHUB_ENV -Append
+           "MIGRATION_API=${{ secrets.C2M_API_URL }}" | Out-File $env:GITHUB_ENV -Append
+           "BATCH_HOST=${{ secrets.C2MDEV_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+         } else {
+           "USERNAME=${{ secrets.C2MTEST_USER }}" | Out-File $env:GITHUB_ENV -Append
+           "PASSWORD=${{ secrets.C2MTEST_PASS }}" | Out-File $env:GITHUB_ENV -Append
+           "MIGRATION_API=${{ secrets.C2MTEST_API_URL }}" | Out-File $env:GITHUB_ENV -Append
+           "BATCH_HOST=${{ secrets.C2MTEST_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+         }
+     - name: Run Migration Script
        run: |
          pwsh ./run-migration.ps1 `
            -Username "$env:USERNAME" `
@@ -207,15 +195,12 @@ jobs:
    needs: approval-before-ccs
    runs-on: self-hosted
    timeout-minutes: 30
-   env:
-     USERNAME: ${{ needs.deploy-and-run.outputs.USERNAME }}
-     PASSWORD: ${{ needs.deploy-and-run.outputs.PASSWORD }}
-     BATCH_HOST: ${{ needs.deploy-and-run.outputs.BATCH_HOST }}
    steps:
      - name: Run CCS Batch Job
        shell: pwsh
        run: |
          $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$env:USERNAME`:$env:PASSWORD"))
+         Write-Host "Submitting CCS batch job to $env:BATCH_HOST"
          Invoke-RestMethod `
            -Method Post `
            -Uri "$env:BATCH_HOST/ouaf/rest/apis/common/batch/batchJobSubmission/" `
