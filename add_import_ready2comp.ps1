@@ -49,11 +49,11 @@ try {
        -SkipCertificateCheck
    Write-Host "Import submitted successfully."
    Write-Host "Response:" ($response | ConvertTo-Json -Depth 5)
-   $migrationDataSetId = $response.migrationDataSetId
+   $mdsId = $response.mdsId
    if (-not $migrationDataSetId) {
        throw "migrationDataSetId not found in response."
    }
-   $statusUri = "$($MigrationApi.TrimEnd('/'))/$migrationDataSetId/migrationImport"
+   $statusUri = "$($MigrationApi.TrimEnd('/'))/$mdsId/migrationImport"
    $pollIntervalSeconds = 15
    $timeoutMinutes = 30
    $elapsed = 0
@@ -101,4 +101,5 @@ catch {
    exit 1
 
 }
+
 
