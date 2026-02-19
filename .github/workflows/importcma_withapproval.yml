@@ -191,7 +191,7 @@ jobs:
          }
      - name: Run Migration Script
        run: |
-         pwsh ./add_import_ready2comp.ps1 `
+         pwsh ./run-migration.ps1 `
            -Username "$env:USERNAME" `
            -Password "$env:PASSWORD" `
            -MigrationApi "$env:MIGRATION_API" `
