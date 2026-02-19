@@ -145,6 +145,7 @@ jobs:
      USERNAME: ${{ steps.load_secrets.outputs.USERNAME }}
      PASSWORD: ${{ steps.load_secrets.outputs.PASSWORD }}
      MIGRATION_API: ${{ steps.load_secrets.outputs.MIGRATION_API }}
+     CMA_FILE: ${{ steps.cma.outputs.cmafile }}
    steps:
      - name: Checkout TARGET_ENV branch
        uses: actions/checkout@v4
@@ -154,14 +155,14 @@ jobs:
        id: cma
        shell: pwsh
        run: |
-         $path = "$PWD\$env:CMA_FOLDER\CMA"
-         $file = Get-ChildItem $path -Filter "*.cma" | Select-Object -First 1
-         if (-not $file) { exit 1 }
+         $folderPath = Join-Path $PWD $env:CMA_FOLDER
+         $file = Get-ChildItem $folderPath -Filter "*.cma" | Select-Object -First 1
+         if (-not $file) { Write-Error "CMA file not found"; exit 1 }
          "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
      - name: Copy CMA to import directory (delete then copy)
        shell: pwsh
        run: |
-         $source = Get-ChildItem -Recurse -Filter "${{ steps.cma.outputs.cmafile }}" | Select-Object -First 1
+         $source = Get-ChildItem -Path "$PWD\$env:CMA_FOLDER" -Filter "${{ steps.cma.outputs.cmafile }}" | Select-Object -First 1
          if (-not $source) { Write-Error "CMA file not found"; exit 1 }
          $destDir  = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
          $destFile = Join-Path $destDir $source.Name
@@ -192,9 +193,9 @@ jobs:
            -MigrationApi "$env:MIGRATION_API" `
            -CmaFile "${{ steps.cma.outputs.cmafile }}"
  approval-before-ccs:
-   needs:
-     - promote-and-upload
-     - deploy-and-run
+   needs: 
+   - promote-and-upload
+   - deploy-and-run
    runs-on: self-hosted
    environment:
      name: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
@@ -202,7 +203,7 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs:
+   needs: 
    - deploy-and-run
    - approval-before-ccs
    runs-on: self-hosted
