@@ -139,13 +139,12 @@ jobs:
    needs: promote-and-upload
    runs-on: self-hosted
    timeout-minutes: 45
-   env:
-     TARGET_ENV: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
-     CMA_FOLDER: ${{ needs.promote-and-upload.outputs.CMA_FOLDER }}
+   environment: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
    outputs:
      BATCH_HOST: ${{ steps.load_secrets.outputs.BATCH_HOST }}
      USERNAME: ${{ steps.load_secrets.outputs.USERNAME }}
      PASSWORD: ${{ steps.load_secrets.outputs.PASSWORD }}
+     MIGRATION_API: ${{ steps.load_secrets.outputs.MIGRATION_API }}
    steps:
      - name: Checkout TARGET_ENV branch
        uses: actions/checkout@v4
@@ -163,38 +162,31 @@ jobs:
        shell: pwsh
        run: |
          $source = Get-ChildItem -Recurse -Filter "${{ steps.cma.outputs.cmafile }}" | Select-Object -First 1
-         if (-not $source) {
-           Write-Error "CMA file not found"
-           exit 1
-         }
+         if (-not $source) { Write-Error "CMA file not found"; exit 1 }
          $destDir  = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
          $destFile = Join-Path $destDir $source.Name
          if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
-         if (Test-Path $destFile) {
-           Write-Host "Existing CMA detected. Removing..."
-           attrib -R $destFile
-           Remove-Item $destFile -Force
-         }
-         Write-Host "Copying CMA file..."
+         if (Test-Path $destFile) { attrib -R $destFile; Remove-Item $destFile -Force }
          Copy-Item $source.FullName $destDir -Force
      - name: Load environment-specific secrets
        id: load_secrets
        shell: pwsh
        run: |
-         if ($env:TARGET_ENV -eq "C2MDEV") {
-           "USERNAME=${{ secrets.C2M_USER }}" | Out-File $env:GITHUB_ENV -Append
-           "PASSWORD=${{ secrets.C2M_PASS }}" | Out-File $env:GITHUB_ENV -Append
-           "MIGRATION_API=${{ secrets.C2M_API_URL }}" | Out-File $env:GITHUB_ENV -Append
-           "BATCH_HOST=${{ secrets.C2MDEV_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
-         } else {
-           "USERNAME=${{ secrets.C2MTEST_USER }}" | Out-File $env:GITHUB_ENV -Append
-           "PASSWORD=${{ secrets.C2MTEST_PASS }}" | Out-File $env:GITHUB_ENV -Append
-           "MIGRATION_API=${{ secrets.C2MTEST_API_URL }}" | Out-File $env:GITHUB_ENV -Append
-           "BATCH_HOST=${{ secrets.C2MTEST_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
-         }
-         "USERNAME=$env:USERNAME" | Out-File $env:GITHUB_OUTPUT -Append
-         "PASSWORD=$env:PASSWORD" | Out-File $env:GITHUB_OUTPUT -Append
-         "BATCH_HOST=$env:BATCH_HOST" | Out-File $env:GITHUB_OUTPUT -Append
+         # Environment secrets injected automatically
+         $USERNAME      = $env:C2M_USER
+         $PASSWORD      = $env:C2M_PASS
+         $MIGRATION_API = $env:C2M_API_URL
+         $BATCH_HOST    = $env:C2MDEV_BATCH_HOST
+         # Export to current job environment
+         "USERNAME=$USERNAME" | Out-File $env:GITHUB_ENV -Append
+         "PASSWORD=$PASSWORD" | Out-File $env:GITHUB_ENV -Append
+         "MIGRATION_API=$MIGRATION_API" | Out-File $env:GITHUB_ENV -Append
+         "BATCH_HOST=$BATCH_HOST" | Out-File $env:GITHUB_ENV -Append
+         # Export as step outputs for downstream jobs
+         echo "USERNAME=$USERNAME" >> $env:GITHUB_OUTPUT
+         echo "PASSWORD=$PASSWORD" >> $env:GITHUB_OUTPUT
+         echo "MIGRATION_API=$MIGRATION_API" >> $env:GITHUB_OUTPUT
+         echo "BATCH_HOST=$BATCH_HOST" >> $env:GITHUB_OUTPUT
      - name: Run Migration Script
        run: |
          pwsh ./run-migration.ps1 `
@@ -213,9 +205,7 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs: 
-   - deploy-and-run
-   - approval-before-ccs
+   needs: deploy-and-run
    runs-on: self-hosted
    timeout-minutes: 30
    env:
@@ -226,9 +216,7 @@ jobs:
      - name: Run CCS Batch Job
        shell: pwsh
        run: |
-         $auth = [Convert]::ToBase64String(
-           [Text.Encoding]::UTF8.GetBytes("$env:USERNAME`:$env:PASSWORD")
-         )
+         $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$env:USERNAME`:$env:PASSWORD"))
          Invoke-RestMethod `
            -Method Post `
            -Uri "$env:BATCH_HOST/ouaf/rest/apis/common/batch/batchJobSubmission/" `
