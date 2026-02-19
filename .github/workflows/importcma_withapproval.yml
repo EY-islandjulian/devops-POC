@@ -187,6 +187,8 @@ jobs:
            -CmaFile "${{ steps.cma.outputs.cmafile }}"
  approval-before-ccs:
    needs: deploy-and-run
+   environment:
+      name: C2MDEV  # Use the 'C2MDEV' environment for approval
    runs-on: self-hosted
    steps:
      - name: Await approval
