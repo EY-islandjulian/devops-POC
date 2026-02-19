@@ -78,7 +78,6 @@ jobs:
          REPO_OWNER: ${{ github.repository_owner }}
          REPO_NAME: ${{ github.event.repository.name }}
        run: |
-         # Ensure tag exists
          $tagExists = git tag -l "${{ inputs.release_tag }}"
          if (-not $tagExists) {
            git tag "${{ inputs.release_tag }}"
@@ -91,12 +90,8 @@ jobs:
          }
          $releaseUrl = "https://api.github.com/repos/$env:REPO_OWNER/$env:REPO_NAME/releases/tags/${{ inputs.release_tag }}"
          try {
-           $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
-           $releaseId = $release.id
+           Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get | Out-Null
          } catch {
-           $releaseId = $null
-         }
-         if (-not $releaseId) {
            $body = @{
              tag_name   = "${{ inputs.release_tag }}"
              name       = "${{ inputs.release_tag }}"
@@ -110,12 +105,10 @@ jobs:
              -Headers $headers `
              -Body $body
          }
-         # Re-fetch release to guarantee upload_url / assets_url
          $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
          $zipPath = $env:CMA_ZIP
          $assetName = [System.IO.Path]::GetFileName($zipPath)
          $uploadUrl = $release.upload_url -replace "\{.*\}", "?name=$assetName"
-         # Delete existing asset if present
          try {
            $assets = Invoke-RestMethod -Uri $release.assets_url -Headers $headers
            $existing = $assets | Where-Object { $_.name -eq $assetName }
@@ -162,13 +155,26 @@ jobs:
          $file = Get-ChildItem $path -Filter "*.cma" | Select-Object -First 1
          if (-not $file) { exit 1 }
          "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
-     - name: Copy CMA to import directory
+     - name: Copy CMA to import directory (delete then copy)
        shell: pwsh
        run: |
          $source = Get-ChildItem -Recurse -Filter "${{ steps.cma.outputs.cmafile }}" | Select-Object -First 1
-         $dest = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
-         if (-not (Test-Path $dest)) { New-Item -ItemType Directory -Path $dest }
-         Copy-Item $source.FullName $dest -Force
+         if (-not $source) {
+           Write-Error "CMA file not found"
+           exit 1
+         }
+         $destDir  = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
+         $destFile = Join-Path $destDir $source.Name
+         if (-not (Test-Path $destDir)) {
+           New-Item -ItemType Directory -Path $destDir | Out-Null
+         }
+         if (Test-Path $destFile) {
+           Write-Host "Existing CMA detected. Removing..."
+           attrib -R $destFile
+           Remove-Item $destFile -Force
+         }
+         Write-Host "Copying CMA file..."
+         Copy-Item $source.FullName $destDir -Force
      - name: Load environment-specific secrets
        shell: pwsh
        run: |
