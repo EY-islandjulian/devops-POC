@@ -195,7 +195,9 @@ jobs:
  run-ccs-batch:
    needs: 
    - promote-and-upload
+   - deploy-and-run
    - approval-before-ccs
+   
    runs-on: self-hosted
    timeout-minutes: 30
    steps:
@@ -242,10 +244,14 @@ jobs:
        if: always()
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            DEPLOY_STATUS: ${{ env.DEPLOY_STATUS }}
+            REPO: ${{ github.repository }}
+            RELEASE_TAG: ${{ inputs.release_tag }}   # workflow input can be used here
        run: |
+         $TargetEnv = "${{ needs.deploy-and-run.outputs.TARGET_ENV }}"
          pwsh -NoProfile -ExecutionPolicy Bypass ./update_release_notes.ps1 `
-           -ReleaseTag $env:RELEASE_TAG `
-           -TargetEnv $env:TARGET_ENV `
-           -DeployStatus $env:DEPLOY_STATUS `
-           -Repo $env:GITHUB_REPOSITORY
+         -ReleaseTag $env:RELEASE_TAG `
+         -TargetEnv $TargetEnv `
+         -DeployStatus $env:DEPLOY_STATUS `
+         -Repo $env:REPO
