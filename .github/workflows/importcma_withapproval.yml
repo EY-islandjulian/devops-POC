@@ -149,7 +149,7 @@ jobs:
      - name: Checkout TARGET_ENV branch
        uses: actions/checkout@v4
        with:
-         ref: ${{ env.TARGET_ENV }}
+         ref: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
      - name: Locate CMA file
        id: cma
        shell: pwsh
@@ -172,17 +172,14 @@ jobs:
        id: load_secrets
        shell: pwsh
        run: |
-         # Environment secrets injected automatically
          $USERNAME      = $env:C2M_USER
          $PASSWORD      = $env:C2M_PASS
          $MIGRATION_API = $env:C2M_API_URL
          $BATCH_HOST    = $env:C2MDEV_BATCH_HOST
-         # Export to current job environment
          "USERNAME=$USERNAME" | Out-File $env:GITHUB_ENV -Append
          "PASSWORD=$PASSWORD" | Out-File $env:GITHUB_ENV -Append
          "MIGRATION_API=$MIGRATION_API" | Out-File $env:GITHUB_ENV -Append
          "BATCH_HOST=$BATCH_HOST" | Out-File $env:GITHUB_ENV -Append
-         # Export as step outputs for downstream jobs
          echo "USERNAME=$USERNAME" >> $env:GITHUB_OUTPUT
          echo "PASSWORD=$PASSWORD" >> $env:GITHUB_OUTPUT
          echo "MIGRATION_API=$MIGRATION_API" >> $env:GITHUB_OUTPUT
@@ -205,7 +202,9 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs: deploy-and-run
+   needs:
+   - deploy-and-run
+   - approval-before-ccs
    runs-on: self-hosted
    timeout-minutes: 30
    env:
