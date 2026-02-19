@@ -40,7 +40,7 @@ try {
    $body = @($importPayload) | ConvertTo-Json
    # DEBUG: Show exactly what we’re sending
    Write-Host "POST BODY:" $body
-   $importUri = "$($MigrationApi.TrimEnd('/'))/addImport"
+   $importUri = "$($MigrationApi.TrimEnd('/'))/migrationImport"
    $response = Invoke-RestMethod `
        -Uri $importUri `
        -Method Post `
@@ -53,7 +53,7 @@ try {
    if (-not $migrationDataSetId) {
        throw "migrationDataSetId not found in response."
    }
-   $statusUri = "$($MigrationApi.TrimEnd('/'))/$migrationDataSetId/import"
+   $statusUri = "$($MigrationApi.TrimEnd('/'))/$migrationDataSetId/migrationImport"
    $pollIntervalSeconds = 15
    $timeoutMinutes = 30
    $elapsed = 0
@@ -101,3 +101,4 @@ catch {
    exit 1
 
 }
+
