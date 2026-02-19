@@ -76,7 +76,7 @@ jobs:
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
          REPO_OWNER: ${{ github.repository_owner }}
-         REPO_NAME: ${{ github.repository }}
+         REPO_NAME: ${{ github.event.repository.name }}
        run: |
          # Ensure tag exists
          $tagExists = git tag -l "${{ inputs.release_tag }}"
@@ -84,43 +84,53 @@ jobs:
            git tag "${{ inputs.release_tag }}"
            git push origin "${{ inputs.release_tag }}"
          }
-         # Check if release exists
+         $headers = @{
+           Authorization = "token $env:GH_TOKEN"
+           "User-Agent"  = "PowerShell"
+           Accept        = "application/vnd.github+json"
+         }
          $releaseUrl = "https://api.github.com/repos/$env:REPO_OWNER/$env:REPO_NAME/releases/tags/${{ inputs.release_tag }}"
-         $headers = @{ Authorization = "token $env:GH_TOKEN"; "User-Agent" = "PowerShell" }
          try {
-           $release = Invoke-RestMethod -Uri $releaseUrl -Method Get -Headers $headers
+           $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
            $releaseId = $release.id
          } catch {
            $releaseId = $null
          }
          if (-not $releaseId) {
-           # Create release
            $body = @{
-             tag_name = "${{ inputs.release_tag }}"
-             name = "${{ inputs.release_tag }}"
-             body = "Automated CMA release"
-             draft = $false
+             tag_name   = "${{ inputs.release_tag }}"
+             name       = "${{ inputs.release_tag }}"
+             body       = "Automated CMA release"
+             draft      = $false
              prerelease = $false
            } | ConvertTo-Json -Depth 3
-           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:REPO_OWNER/$env:REPO_NAME/releases" `
-                                        -Method Post -Headers $headers -Body $body
-           $releaseId = $release.id
+           Invoke-RestMethod `
+             -Uri "https://api.github.com/repos/$env:REPO_OWNER/$env:REPO_NAME/releases" `
+             -Method Post `
+             -Headers $headers `
+             -Body $body
          }
-         # Upload CMA ZIP artifact to release
-         $zipPath = "$env:CMA_ZIP"
+         # Re-fetch release to guarantee upload_url / assets_url
+         $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers -Method Get
+         $zipPath = $env:CMA_ZIP
          $assetName = [System.IO.Path]::GetFileName($zipPath)
          $uploadUrl = $release.upload_url -replace "\{.*\}", "?name=$assetName"
-         # Delete existing asset if exists
+         # Delete existing asset if present
          try {
-           $existingAssets = Invoke-RestMethod -Uri $release.assets_url -Headers $headers
-           $existingAsset = $existingAssets | Where-Object { $_.name -eq $assetName }
-           if ($existingAsset) {
-             Invoke-RestMethod -Uri $existingAsset.url -Headers $headers -Method Delete
+           $assets = Invoke-RestMethod -Uri $release.assets_url -Headers $headers
+           $existing = $assets | Where-Object { $_.name -eq $assetName }
+           if ($existing) {
+             Invoke-RestMethod -Uri $existing.url -Method Delete -Headers $headers
            }
-         } catch { }
-         # Upload asset
-         Invoke-RestMethod -Uri $uploadUrl -Headers @{ Authorization = "token $env:GH_TOKEN"; "Content-Type"="application/zip" } `
-                           -Method Post -InFile $zipPath
+         } catch {}
+         Invoke-RestMethod `
+           -Uri $uploadUrl `
+           -Method Post `
+           -Headers @{
+             Authorization = "token $env:GH_TOKEN"
+             "Content-Type" = "application/zip"
+           } `
+           -InFile $zipPath
      - name: Promote CMA to target environment
        shell: pwsh
        run: |
@@ -130,8 +140,7 @@ jobs:
          git config user.name "github-actions"
          git config user.email "github-actions@github.com"
          git add $env:CMA_FOLDER
-         git commit -m "Promote CMA $env:CMA_FOLDER (${{ inputs.release_tag }})" `
-           || Write-Host "Nothing to commit"
+         git commit -m "Promote CMA $env:CMA_FOLDER (${{ inputs.release_tag }})" || Write-Host "Nothing to commit"
          git push origin $env:TARGET_BRANCH
  deploy-and-run:
    needs: promote-and-upload
@@ -152,7 +161,7 @@ jobs:
          $path = "$PWD\$env:CMA_FOLDER\CMA"
          $file = Get-ChildItem $path -Filter "*.cma" | Select-Object -First 1
          if (-not $file) { exit 1 }
-         echo "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
+         "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
      - name: Copy CMA to import directory
        shell: pwsh
        run: |
