@@ -231,7 +231,7 @@ jobs:
              F1SubmitJob = @{
                jobDetails = @{ batchControl = "F1-MGOPR" }
              }
-           } | ConvertTo-Json -Depth 5)
+           } | ConvertTo-Json -Depth 5) -SkipCertificateCheck
      - name: Mark deployment SUCCESS
        if: success()
        run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
