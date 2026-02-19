@@ -167,7 +167,9 @@ jobs:
      - name: Load environment-specific secrets
        shell: pwsh
        run: |
-         if ($env:TARGET_ENV -eq "C2MDEV") {
+        $targetEnv = "${{ needs.promote-and-upload.outputs.TARGET_ENV }}"
+       
+         if ( $targetEnv -eq "C2MDEV") {
            "USERNAME=${{ secrets.C2M_USER }}" | Out-File $env:GITHUB_ENV -Append
            "PASSWORD=${{ secrets.C2M_PASS }}" | Out-File $env:GITHUB_ENV -Append
            "MIGRATION_API=${{ secrets.C2M_API_URL }}" | Out-File $env:GITHUB_ENV -Append
