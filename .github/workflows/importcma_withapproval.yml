@@ -193,9 +193,7 @@ jobs:
            -MigrationApi "$env:MIGRATION_API" `
            -CmaFile "${{ steps.cma.outputs.cmafile }}"
  approval-before-ccs:
-   needs: 
-   - promote-and-upload
-   - deploy-and-run
+   needs: deploy-and-run
    runs-on: self-hosted
    environment:
      name: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
@@ -203,9 +201,7 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs: 
-   - deploy-and-run
-   - approval-before-ccs
+   needs: approval-before-ccs
    runs-on: self-hosted
    timeout-minutes: 30
    env:
