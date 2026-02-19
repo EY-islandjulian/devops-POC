@@ -156,13 +156,16 @@ jobs:
        shell: pwsh
        run: |
          $folderPath = Join-Path $PWD $env:CMA_FOLDER
-         $file = Get-ChildItem $folderPath -Filter "*.cma" | Select-Object -First 1
-         if (-not $file) { Write-Error "CMA file not found"; exit 1 }
+         $file = Get-ChildItem -Path $folderPath -Filter "*.cma" -Recurse | Select-Object -First 1
+         if (-not $file) {
+             Write-Error "CMA file not found in $folderPath"
+             exit 1
+         }
          "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
      - name: Copy CMA to import directory (delete then copy)
        shell: pwsh
        run: |
-         $source = Get-ChildItem -Path "$PWD\$env:CMA_FOLDER" -Filter "${{ steps.cma.outputs.cmafile }}" | Select-Object -First 1
+         $source = Get-ChildItem -Path "$PWD\$env:CMA_FOLDER" -Filter "${{ steps.cma.outputs.cmafile }}" -Recurse | Select-Object -First 1
          if (-not $source) { Write-Error "CMA file not found"; exit 1 }
          $destDir  = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
          $destFile = Join-Path $destDir $source.Name
