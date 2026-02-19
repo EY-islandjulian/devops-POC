@@ -142,6 +142,10 @@ jobs:
    env:
      TARGET_ENV: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
      CMA_FOLDER: ${{ needs.promote-and-upload.outputs.CMA_FOLDER }}
+   outputs:
+     BATCH_HOST: ${{ steps.load_secrets.outputs.BATCH_HOST }}
+     USERNAME: ${{ steps.load_secrets.outputs.USERNAME }}
+     PASSWORD: ${{ steps.load_secrets.outputs.PASSWORD }}
    steps:
      - name: Checkout TARGET_ENV branch
        uses: actions/checkout@v4
@@ -165,9 +169,7 @@ jobs:
          }
          $destDir  = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
          $destFile = Join-Path $destDir $source.Name
-         if (-not (Test-Path $destDir)) {
-           New-Item -ItemType Directory -Path $destDir | Out-Null
-         }
+         if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
          if (Test-Path $destFile) {
            Write-Host "Existing CMA detected. Removing..."
            attrib -R $destFile
@@ -176,6 +178,7 @@ jobs:
          Write-Host "Copying CMA file..."
          Copy-Item $source.FullName $destDir -Force
      - name: Load environment-specific secrets
+       id: load_secrets
        shell: pwsh
        run: |
          if ($env:TARGET_ENV -eq "C2MDEV") {
@@ -189,6 +192,9 @@ jobs:
            "MIGRATION_API=${{ secrets.C2MTEST_API_URL }}" | Out-File $env:GITHUB_ENV -Append
            "BATCH_HOST=${{ secrets.C2MTEST_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
          }
+         "USERNAME=$env:USERNAME" | Out-File $env:GITHUB_OUTPUT -Append
+         "PASSWORD=$env:PASSWORD" | Out-File $env:GITHUB_OUTPUT -Append
+         "BATCH_HOST=$env:BATCH_HOST" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Run Migration Script
        run: |
          pwsh ./run-migration.ps1 `
@@ -207,9 +213,15 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs: approval-before-ccs
+   needs: 
+   - deploy-and-run
+   - approval-before-ccs
    runs-on: self-hosted
    timeout-minutes: 30
+   env:
+     BATCH_HOST: ${{ needs.deploy-and-run.outputs.BATCH_HOST }}
+     USERNAME: ${{ needs.deploy-and-run.outputs.USERNAME }}
+     PASSWORD: ${{ needs.deploy-and-run.outputs.PASSWORD }}
    steps:
      - name: Run CCS Batch Job
        shell: pwsh
