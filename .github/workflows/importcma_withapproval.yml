@@ -34,19 +34,19 @@ jobs:
        shell: pwsh
        run: |
          $target = "${{ inputs.target_env }}"
-         # Set as environment variable
          "TARGET_ENV=$target" | Out-File -FilePath $env:GITHUB_ENV -Append
-         # Set as step output for job outputs
-         echo "TARGET_ENV=$target" >> $GITHUB_OUTPUT
+         Write-Output "TARGET_ENV=$target" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
      - name: Extract CMA folder
        id: extract_cma
        shell: pwsh
        run: |
          $parts = "${{ inputs.release_tag }}".Split("-", 2)
-         if ($parts.Length -lt 2) { Write-Error "Invalid release tag format"; exit 1 }
-         $cma = $parts[1]
-         "CMA_FOLDER=$cma" | Out-File $env:GITHUB_ENV -Append
-         echo "CMA_FOLDER=$cma" >> $GITHUB_OUTPUT
+         if ($parts.Length -lt 2) {
+           Write-Error "Invalid release tag format"
+           exit 1
+         }
+         "CMA_FOLDER=$($parts[1])" | Out-File $env:GITHUB_ENV -Append
+         "CMA_FOLDER=$($parts[1])" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Determine branches
        shell: pwsh
        run: |
@@ -66,7 +66,10 @@ jobs:
          git checkout $env:SOURCE_BRANCH
          $folderPath = Join-Path $PWD $env:CMA_FOLDER
          $zipName = "$env:CMA_FOLDER-${{ inputs.release_tag }}.zip"
-         if (-not (Test-Path $folderPath)) { Write-Error "CMA folder not found"; exit 1 }
+         if (-not (Test-Path $folderPath)) {
+           Write-Error "CMA folder not found"
+           exit 1
+         }
          Compress-Archive -Path "$folderPath/*" -DestinationPath $zipName -Force
          "CMA_ZIP=$zipName" | Out-File $env:GITHUB_ENV -Append
      - name: Tag / Release management (No GH CLI)
@@ -110,7 +113,9 @@ jobs:
          try {
            $assets = Invoke-RestMethod -Uri $release.assets_url -Headers $headers
            $existing = $assets | Where-Object { $_.name -eq $assetName }
-           if ($existing) { Invoke-RestMethod -Uri $existing.url -Method Delete -Headers $headers }
+           if ($existing) {
+             Invoke-RestMethod -Uri $existing.url -Method Delete -Headers $headers
+           }
          } catch {}
          Invoke-RestMethod `
            -Uri $uploadUrl `
@@ -146,7 +151,10 @@ jobs:
        run: |
          $folderPath = Join-Path $PWD $env:CMA_FOLDER
          $file = Get-ChildItem -Path $folderPath -Filter "*.cma" -Recurse | Select-Object -First 1
-         if (-not $file) { Write-Error "CMA file not found in $folderPath"; exit 1 }
+         if (-not $file) {
+             Write-Error "CMA file not found in $folderPath"
+             exit 1
+         }
          "cmafile=$($file.Name)" >> $env:GITHUB_OUTPUT
      - name: Copy CMA to import directory (delete then copy)
        shell: pwsh
@@ -157,24 +165,25 @@ jobs:
          if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
          if (Test-Path $destFile) { attrib -R $destFile; Remove-Item $destFile -Force }
          Copy-Item $source.FullName $destDir -Force
-     - name: Run Migration Script with environment secrets
+     - name: Run Migration Script with secrets
        shell: pwsh
        run: |
-         if ("${{ needs.promote-and-upload.outputs.TARGET_ENV }}" -eq "C2MDEV") {
-           $env:USERNAME = "${{ secrets.C2M_USER }}"
-           $env:PASSWORD = "${{ secrets.C2M_PASS }}"
-           $env:MIGRATION_API = "${{ secrets.C2M_API_URL }}"
-           $env:BATCH_HOST = "${{ secrets.C2MDEV_BATCH_HOST }}"
+         $targetEnv = "${{ needs.promote-and-upload.outputs.TARGET_ENV }}"
+         if ($targetEnv -eq "C2MDEV") {
+           $Username = "${{ secrets.C2M_USER }}"
+           $Password = "${{ secrets.C2M_PASS }}"
+           $MigrationApi = "${{ secrets.C2M_API_URL }}"
+           $BatchHost = "${{ secrets.C2MDEV_BATCH_HOST }}"
          } else {
-           $env:USERNAME = "${{ secrets.C2MTEST_USER }}"
-           $env:PASSWORD = "${{ secrets.C2MTEST_PASS }}"
-           $env:MIGRATION_API = "${{ secrets.C2MTEST_API_URL }}"
-           $env:BATCH_HOST = "${{ secrets.C2MTEST_BATCH_HOST }}"
+           $Username = "${{ secrets.C2MTEST_USER }}"
+           $Password = "${{ secrets.C2MTEST_PASS }}"
+           $MigrationApi = "${{ secrets.C2MTEST_API_URL }}"
+           $BatchHost = "${{ secrets.C2MTEST_BATCH_HOST }}"
          }
          pwsh ./run-migration.ps1 `
-           -Username "$env:USERNAME" `
-           -Password "$env:PASSWORD" `
-           -MigrationApi "$env:MIGRATION_API" `
+           -Username $Username `
+           -Password $Password `
+           -MigrationApi $MigrationApi `
            -CmaFile "${{ steps.cma.outputs.cmafile }}"
  approval-before-ccs:
    needs: deploy-and-run
