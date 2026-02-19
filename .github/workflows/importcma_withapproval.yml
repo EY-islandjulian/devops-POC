@@ -192,36 +192,28 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs: 
-   - promote-and-upload
-   - deploy-and-run
-   - approval-before-ccs
+   needs: approval-before-ccs
    runs-on: self-hosted
    timeout-minutes: 30
    steps:
-     - name: Load environment-specific secrets for CCS
+     - name: Run CCS Batch Job with secrets
        shell: pwsh
        run: |
          $targetEnv = "${{ needs.promote-and-upload.outputs.TARGET_ENV }}"
          if ($targetEnv -eq "C2MDEV") {
-           "USERNAME=${{ secrets.C2M_USER }}" | Out-File $env:GITHUB_ENV -Append
-           "PASSWORD=${{ secrets.C2M_PASS }}" | Out-File $env:GITHUB_ENV -Append
-           "MIGRATION_API=${{ secrets.C2M_API_URL }}" | Out-File $env:GITHUB_ENV -Append
-           "BATCH_HOST=${{ secrets.C2MDEV_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+           $Username = "${{ secrets.C2M_USER }}"
+           $Password = "${{ secrets.C2M_PASS }}"
+           $BatchHost = "${{ secrets.C2MDEV_BATCH_HOST }}"
          } else {
-           "USERNAME=${{ secrets.C2MTEST_USER }}" | Out-File $env:GITHUB_ENV -Append
-           "PASSWORD=${{ secrets.C2MTEST_PASS }}" | Out-File $env:GITHUB_ENV -Append
-           "MIGRATION_API=${{ secrets.C2MTEST_API_URL }}" | Out-File $env:GITHUB_ENV -Append
-           "BATCH_HOST=${{ secrets.C2MTEST_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+           $Username = "${{ secrets.C2MTEST_USER }}"
+           $Password = "${{ secrets.C2MTEST_PASS }}"
+           $BatchHost = "${{ secrets.C2MTEST_BATCH_HOST }}"
          }
-     - name: Run CCS Batch Job
-       shell: pwsh
-       run: |
-         $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$env:USERNAME`:$env:PASSWORD"))
-         Write-Host "Submitting CCS batch job to $env:BATCH_HOST"
+         $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$Username`:$Password"))
+         Write-Host "Submitting CCS batch job to $BatchHost"
          Invoke-RestMethod `
            -Method Post `
-           -Uri "$env:BATCH_HOST/ouaf/rest/apis/common/batch/batchJobSubmission/" `
+           -Uri "$BatchHost/ouaf/rest/apis/common/batch/batchJobSubmission/" `
            -Headers @{
              Authorization = "Basic $auth"
              "Content-Type" = "application/json"
