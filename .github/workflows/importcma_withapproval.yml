@@ -139,18 +139,36 @@ jobs:
    needs: promote-and-upload
    runs-on: self-hosted
    timeout-minutes: 45
-   environment: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
    outputs:
-     BATCH_HOST: ${{ steps.load_secrets.outputs.BATCH_HOST }}
      USERNAME: ${{ steps.load_secrets.outputs.USERNAME }}
      PASSWORD: ${{ steps.load_secrets.outputs.PASSWORD }}
      MIGRATION_API: ${{ steps.load_secrets.outputs.MIGRATION_API }}
+     BATCH_HOST: ${{ steps.load_secrets.outputs.BATCH_HOST }}
      CMA_FILE: ${{ steps.cma.outputs.cmafile }}
    steps:
      - name: Checkout TARGET_ENV branch
        uses: actions/checkout@v4
        with:
          ref: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
+     - name: Load environment-specific secrets
+       id: load_secrets
+       shell: pwsh
+       run: |
+         if ($env:TARGET_ENV -eq "C2MDEV") {
+           $USERNAME      = $env:C2M_USER
+           $PASSWORD      = $env:C2M_PASS
+           $MIGRATION_API = $env:C2M_API_URL
+           $BATCH_HOST    = $env:C2MDEV_BATCH_HOST
+         } else {
+           $USERNAME      = $env:C2MTEST_USER
+           $PASSWORD      = $env:C2MTEST_PASS
+           $MIGRATION_API = $env:C2MTEST_API_URL
+           $BATCH_HOST    = $env:C2MTEST_BATCH_HOST
+         }
+         echo "USERNAME=$USERNAME" >> $env:GITHUB_OUTPUT
+         echo "PASSWORD=$PASSWORD" >> $env:GITHUB_OUTPUT
+         echo "MIGRATION_API=$MIGRATION_API" >> $env:GITHUB_OUTPUT
+         echo "BATCH_HOST=$BATCH_HOST" >> $env:GITHUB_OUTPUT
      - name: Locate CMA file
        id: cma
        shell: pwsh
@@ -166,29 +184,13 @@ jobs:
        shell: pwsh
        run: |
          $source = Get-ChildItem -Path "$PWD\$env:CMA_FOLDER" -Filter "${{ steps.cma.outputs.cmafile }}" -Recurse | Select-Object -First 1
-         if (-not $source) { Write-Error "CMA file not found"; exit 1 }
          $destDir  = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
          $destFile = Join-Path $destDir $source.Name
          if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
          if (Test-Path $destFile) { attrib -R $destFile; Remove-Item $destFile -Force }
          Copy-Item $source.FullName $destDir -Force
-     - name: Load environment-specific secrets
-       id: load_secrets
-       shell: pwsh
-       run: |
-         $USERNAME      = $env:C2M_USER
-         $PASSWORD      = $env:C2M_PASS
-         $MIGRATION_API = $env:C2M_API_URL
-         $BATCH_HOST    = $env:C2MDEV_BATCH_HOST
-         "USERNAME=$USERNAME" | Out-File $env:GITHUB_ENV -Append
-         "PASSWORD=$PASSWORD" | Out-File $env:GITHUB_ENV -Append
-         "MIGRATION_API=$MIGRATION_API" | Out-File $env:GITHUB_ENV -Append
-         "BATCH_HOST=$BATCH_HOST" | Out-File $env:GITHUB_ENV -Append
-         echo "USERNAME=$USERNAME" >> $env:GITHUB_OUTPUT
-         echo "PASSWORD=$PASSWORD" >> $env:GITHUB_OUTPUT
-         echo "MIGRATION_API=$MIGRATION_API" >> $env:GITHUB_OUTPUT
-         echo "BATCH_HOST=$BATCH_HOST" >> $env:GITHUB_OUTPUT
      - name: Run Migration Script
+       shell: pwsh
        run: |
          pwsh ./run-migration.ps1 `
            -Username "$env:USERNAME" `
@@ -198,8 +200,6 @@ jobs:
  approval-before-ccs:
    needs: deploy-and-run
    runs-on: self-hosted
-   environment:
-     name: ${{ needs.promote-and-upload.outputs.TARGET_ENV }}
    steps:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
@@ -208,9 +208,9 @@ jobs:
    runs-on: self-hosted
    timeout-minutes: 30
    env:
-     BATCH_HOST: ${{ needs.deploy-and-run.outputs.BATCH_HOST }}
      USERNAME: ${{ needs.deploy-and-run.outputs.USERNAME }}
      PASSWORD: ${{ needs.deploy-and-run.outputs.PASSWORD }}
+     BATCH_HOST: ${{ needs.deploy-and-run.outputs.BATCH_HOST }}
    steps:
      - name: Run CCS Batch Job
        shell: pwsh
