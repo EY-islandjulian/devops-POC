@@ -164,12 +164,11 @@ jobs:
          if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir | Out-Null }
          if (Test-Path $destFile) { attrib -R $destFile; Remove-Item $destFile -Force }
          Copy-Item $source.FullName $destDir -Force
-     - name: Load environment-specific secrets
+     - name: Load environment-specific secrets for migration
        shell: pwsh
        run: |
-        $targetEnv = "${{ needs.promote-and-upload.outputs.TARGET_ENV }}"
-       
-         if ( $targetEnv -eq "C2MDEV") {
+         $targetEnv = "${{ needs.promote-and-upload.outputs.TARGET_ENV }}"
+         if ($targetEnv -eq "C2MDEV") {
            "USERNAME=${{ secrets.C2M_USER }}" | Out-File $env:GITHUB_ENV -Append
            "PASSWORD=${{ secrets.C2M_PASS }}" | Out-File $env:GITHUB_ENV -Append
            "MIGRATION_API=${{ secrets.C2M_API_URL }}" | Out-File $env:GITHUB_ENV -Append
@@ -194,10 +193,27 @@ jobs:
      - name: Await approval
        run: echo "Approved. Proceeding to CCS Batch Job."
  run-ccs-batch:
-   needs: approval-before-ccs
+   needs: 
+   - promote-and-upload
+   - approval-before-ccs
    runs-on: self-hosted
    timeout-minutes: 30
    steps:
+     - name: Load environment-specific secrets for CCS
+       shell: pwsh
+       run: |
+         $targetEnv = "${{ needs.promote-and-upload.outputs.TARGET_ENV }}"
+         if ($targetEnv -eq "C2MDEV") {
+           "USERNAME=${{ secrets.C2M_USER }}" | Out-File $env:GITHUB_ENV -Append
+           "PASSWORD=${{ secrets.C2M_PASS }}" | Out-File $env:GITHUB_ENV -Append
+           "MIGRATION_API=${{ secrets.C2M_API_URL }}" | Out-File $env:GITHUB_ENV -Append
+           "BATCH_HOST=${{ secrets.C2MDEV_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+         } else {
+           "USERNAME=${{ secrets.C2MTEST_USER }}" | Out-File $env:GITHUB_ENV -Append
+           "PASSWORD=${{ secrets.C2MTEST_PASS }}" | Out-File $env:GITHUB_ENV -Append
+           "MIGRATION_API=${{ secrets.C2MTEST_API_URL }}" | Out-File $env:GITHUB_ENV -Append
+           "BATCH_HOST=${{ secrets.C2MTEST_BATCH_HOST }}" | Out-File $env:GITHUB_ENV -Append
+         }
      - name: Run CCS Batch Job
        shell: pwsh
        run: |
