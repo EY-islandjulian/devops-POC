@@ -32,13 +32,10 @@ jobs:
        shell: pwsh
        run: |
          $parts="${{ inputs.release_tag }}".Split("-",2)
-         if ($parts.Length -lt 2){
-           throw "Invalid tag format"
-         }
+         if ($parts.Length -lt 2){ throw "Invalid tag format" }
          $folder=$parts[1]
          "CMA_FOLDER=$folder" | Out-File $env:GITHUB_ENV -Append
          "CMA_FOLDER=$folder" | Out-File $env:GITHUB_OUTPUT -Append
-
      - name: Resolve promotion source
        id: resolve
        shell: pwsh
@@ -50,7 +47,6 @@ jobs:
          }
          "SOURCE_BRANCH=$src" | Out-File $env:GITHUB_ENV -Append
          "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
-
      - name: Create promotion branch for folder
        id: tempbranch
        shell: pwsh
@@ -60,20 +56,20 @@ jobs:
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
          $tempBranch="promote-$folder-$tag"
-         Write-Host "Checkout source branch"
-         git checkout $source
-         Write-Host "Create temp branch"
-         git checkout -b $tempBranch
-         Write-Host "Reset to target branch base"
-         git fetch origin $target
-         git reset --hard origin/$target
-         Write-Host "Pull only folder from source"
-         git checkout $source -- $folder
+         Write-Host "Fetching latest branches"
+         git fetch origin
+         Write-Host "Checkout target branch as base"
+         git checkout -b $tempBranch origin/$target
+         Write-Host "Pull ONLY the folder from source branch"
+         git checkout origin/$source -- $folder
+         if ((git status --porcelain).Length -eq 0) {
+           Write-Host "No folder changes to promote"
+           exit 0
+         }
          git add $folder
          git commit -m "Promote folder $folder for release $tag"
          git push origin $tempBranch
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
-
      - name: Create Promotion Pull Request
        shell: pwsh
        env:
@@ -95,7 +91,12 @@ jobs:
            --head "$branch" `
            --title "$title" `
            --body "$body"
-
+#      - name: Enable PR Auto Merge
+#        env:
+#          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        run: |
+#          PR=$(gh pr list --base "${{ steps.resolve.outputs.TARGET_ENV }}" --head "${{ steps.tempbranch.outputs.TEMP_BRANCH }}" --json number --jq '.[0].number')
+#          gh pr merge $PR --auto --squash
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
@@ -107,7 +108,6 @@ jobs:
        with:
          ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
          fetch-depth: 0
-
      - name: Create CMA ZIP
        shell: pwsh
        run: |
@@ -116,7 +116,6 @@ jobs:
          $zip="$folder-$tag.zip"
          Compress-Archive "$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
-
      - name: Tag and Release
        shell: pwsh
        env:
@@ -137,13 +136,11 @@ jobs:
              --title "$tag" `
              --notes "Automated release for CMA $tag" `
              --repo $env:GITHUB_REPOSITORY
-         }
-         else {
+         } else {
            gh release upload $tag $env:CMA_ZIP `
              --clobber `
              --repo $env:GITHUB_REPOSITORY
          }
-
 #
 #  deploy-cma:
 #
@@ -164,7 +161,6 @@ jobs:
 #      - name: Disabled temporarily
 #        run: echo "apply-import job is disabled for now"
 #
-
  post-deploy:
    needs:
      - promote-and-upload
@@ -184,7 +180,7 @@ jobs:
        env:
          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        run: |
-         pwsh ./update_release_notes.ps1 `
+         pwsh ./Scripts/update_release_notes.ps1 `
            -ReleaseTag "${{ github.event.inputs.release_tag }}" `
            -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
            -DeployStatus $env:DEPLOY_STATUS `
