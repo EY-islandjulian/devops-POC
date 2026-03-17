@@ -21,7 +21,6 @@ jobs:
    runs-on: ubuntu-latest
    outputs:
      TEMP_BRANCH: ${{ steps.create_branch.outputs.TEMP_BRANCH }}
-     SOURCE_BRANCH: ${{ steps.resolve.outputs.SOURCE_BRANCH }}
      TARGET_ENV: ${{ steps.resolve.outputs.TARGET_ENV }}
      CMA_FOLDER: ${{ steps.extract.outputs.CMA_FOLDER }}
    steps:
@@ -69,6 +68,7 @@ jobs:
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
          git commit -m "Promote CMA folder $folder for release $tag" --allow-empty
+         # Push temp branch
          git push origin HEAD --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Create PR from temp branch
@@ -82,8 +82,13 @@ jobs:
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $title="Promote CMA folder $folder ($tag) to $target"
          $body="Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
-         Write-Host "Creating PR from $branch to $target"
+         Write-Host "Creating PR from $branch to $target..."
          gh pr create --base "$target" --head "$branch" --title "$title" --body "$body"
+     - name: Upload CMA folder as artifact
+       uses: actions/upload-artifact@v4
+       with:
+         name: cma-folder
+         path: ${{ steps.extract.outputs.CMA_FOLDER }}
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
@@ -95,13 +100,17 @@ jobs:
        with:
          ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
          fetch-depth: 0
+     - name: Download CMA folder artifact
+       uses: actions/download-artifact@v4
+       with:
+         name: cma-folder
+         path: ./cma-folder
      - name: Create CMA ZIP
        shell: pwsh
        run: |
          $folder="${{ needs.promote-pr.outputs.CMA_FOLDER }}"
-         $tag="${{ inputs.release_tag }}"
-         $zip="$folder-$tag.zip"
-         Compress-Archive "$folder/*" $zip -Force
+         $zip="$folder-$(${{ inputs.release_tag }}).zip"
+         Compress-Archive "./cma-folder/$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
      - name: Tag and Release
        shell: pwsh
@@ -109,8 +118,9 @@ jobs:
          GH_TOKEN: ${{ github.token }}
        run: |
          $tag="${{ inputs.release_tag }}"
-         $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
+         $zip = Get-ChildItem *.zip | Select-Object -First 1
          git fetch origin --tags
+         $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
          if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
            if (-not (git tag -l "$tag")) {
              git tag $tag
@@ -119,9 +129,9 @@ jobs:
          }
          $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
          if (-not $releaseExists) {
-           gh release create $tag $env:CMA_ZIP --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
+           gh release create $tag $zip --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
          } else {
-           gh release upload $tag $env:CMA_ZIP --clobber --repo $env:GITHUB_REPOSITORY
+           gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
          }
  post-deploy:
    needs:
