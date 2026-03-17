@@ -106,9 +106,9 @@ jobs:
        shell: pwsh
        run: |
          $folder="${{ needs.promote-pr.outputs.CMA_FOLDER }}"
+         if (-not (Test-Path $folder)) { throw "Folder '$folder' does not exist." }
          $tag="${{ inputs.release_tag }}"
          $zip="$folder-$tag.zip"
-         if (-not (Test-Path $folder)) { throw "Folder '$folder' does not exist." }
          Compress-Archive "$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
      - name: Tag and Release
