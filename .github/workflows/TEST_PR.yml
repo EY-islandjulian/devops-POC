@@ -60,15 +60,12 @@ jobs:
          Write-Host "Fetching target branch $target..."
          git fetch origin $target
          git checkout -b $tempBranch origin/$target
-         # Pull CMA folder from source branch
          git fetch origin $source
          git checkout origin/$source -- $folder
-         # Stage and commit
          git add -A
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
          git commit -m "Promote CMA folder $folder for release $tag" --allow-empty
-         # Push temp branch
          git push origin HEAD --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Create PR from temp branch
@@ -83,7 +80,11 @@ jobs:
          $title="Promote CMA folder $folder ($tag) to $target"
          $body="Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
          Write-Host "Creating PR from $branch to $target"
-         gh pr create --base "$target" --head "$branch" --title "$title" --body "$body"
+         gh pr create `
+           --base "$target" `
+           --head "$branch" `
+           --title "$title" `
+           --body "$body"
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
@@ -93,14 +94,14 @@ jobs:
    steps:
      - uses: actions/checkout@v4
        with:
-         ref: ${{ needs.promote-pr.outputs.TEMP_BRANCH }}
+         ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
          fetch-depth: 0
      - name: Create CMA ZIP
        shell: pwsh
        run: |
          $folder="${{ needs.promote-pr.outputs.CMA_FOLDER }}"
-         if (-not (Test-Path $folder)) { throw "Folder '$folder' does not exist." }
          $tag="${{ inputs.release_tag }}"
+         if (-not (Test-Path $folder)) { throw "Folder '$folder' does not exist." }
          $zip="$folder-$tag.zip"
          Compress-Archive "$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
@@ -114,36 +115,24 @@ jobs:
          $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
          git fetch origin --tags
          if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
-             if (-not (git tag -l "$tag")) {
-                 git tag $tag
-                 git push origin $tag
-             }
+           if (-not (git tag -l "$tag")) {
+             git tag $tag
+             git push origin $tag
+           }
          }
          $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
          if (-not $releaseExists) {
-             gh release create $tag $zip --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
+           gh release create $tag $zip --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
          } else {
-             gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
+           gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
          }
-# deploy-cma:
-#   needs: promote-and-upload
-#   runs-on: ubuntu-latest
-#   steps:
-#     - name: Disabled temporarily
-#       run: echo "deploy-cma job is disabled for now"
-# apply-import:
-#   needs: deploy-cma
-#   runs-on: ubuntu-latest
-#   steps:
-#     - name: Disabled temporarily
-#       run: echo "apply-import job is disabled for now"
  post-deploy:
-  needs:
+   needs:
    - promote-and-upload
    - promote-pr
-  runs-on: ubuntu-latest
-  if: always()
-  steps:
+   runs-on: ubuntu-latest
+   if: always()
+   steps:
    - uses: actions/checkout@v4
    - name: Mark deployment SUCCESS
      if: success()
