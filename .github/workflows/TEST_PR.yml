@@ -28,7 +28,7 @@ jobs:
      - uses: actions/checkout@v4
        with:
          fetch-depth: 0
-     - name: Extract CMA folder from release tag
+     - name: Extract CMA folder
        id: extract
        shell: pwsh
        run: |
@@ -59,14 +59,18 @@ jobs:
          $tempBranch="promote-$folder-$tag"
          Write-Host "Fetching target branch $target..."
          git fetch origin $target
+         # Create temp branch from target branch
          git checkout -b $tempBranch origin/$target
-         # Pull CMA folder from source branch (C2MDEV)
+         # Pull CMA folder from source branch
          git fetch origin $source
          git checkout origin/$source -- $folder
+         # Stage CMA folder
          git add -A
+         # Commit changes
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
          git commit -m "Promote CMA folder $folder for release $tag" --allow-empty
+         # Push temp branch
          git push origin HEAD --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Create PR from temp branch
@@ -83,10 +87,11 @@ jobs:
          # Check if an open PR already exists
          $existingPR = gh pr list --base "$target" --head "$branch" --state open --json number --jq '.[0].number'
          if ($existingPR) {
-           Write-Host "Open PR #$existingPR already exists. Updating commit in temp branch..."
+             Write-Host "Open PR #$existingPR already exists. Skipping creation."
+         } else {
+             Write-Host "Creating PR from $branch to $target..."
+             gh pr create --base "$target" --head "$branch" --title "$title" --body "$body"
          }
-         Write-Host "Creating PR from $branch to $target..."
-         gh pr create --base "$target" --head "$branch" --title "$title" --body "$body" || Write-Host "PR already exists, continuing"
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
@@ -98,21 +103,12 @@ jobs:
        with:
          ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
          fetch-depth: 0
-     - name: Create CMA ZIP (rerunnable safe)
+     - name: Create CMA ZIP
        shell: pwsh
-       env:
-         GH_TOKEN: ${{ github.token }}
        run: |
          $folder="${{ needs.promote-pr.outputs.CMA_FOLDER }}"
+         if (-not (Test-Path $folder)) { throw "Folder '$folder' does not exist." }
          $tag="${{ inputs.release_tag }}"
-         # If folder doesn't exist locally, restore from previous release ZIP
-         if (-not (Test-Path $folder)) {
-           Write-Host "Folder $folder not found. Attempting to restore from release..."
-           $zipFile = gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*$folder*.zip" --dir "./" | Out-Null
-           $zipFile = Get-ChildItem *.zip | Where-Object { $_.Name -like "*$folder*" } | Select-Object -First 1
-           if (-not $zipFile) { throw "CMA ZIP not found in release assets." }
-           Expand-Archive $zipFile.FullName -DestinationPath "./$folder" -Force
-         }
          $zip="$folder-$tag.zip"
          Compress-Archive "$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
@@ -122,20 +118,19 @@ jobs:
          GH_TOKEN: ${{ github.token }}
        run: |
          $tag="${{ inputs.release_tag }}"
-         $zip = Get-ChildItem *.zip | Select-Object -First 1
-         git fetch origin --tags
          $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
+         git fetch origin --tags
          if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
-           if (-not (git tag -l "$tag")) {
-             git tag $tag
-             git push origin $tag
-           }
+             if (-not (git tag -l "$tag")) {
+                 git tag $tag
+                 git push origin $tag
+             }
          }
          $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
          if (-not $releaseExists) {
-           gh release create $tag $zip --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
+             gh release create $tag $env:CMA_ZIP --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
          } else {
-           gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
+             gh release upload $tag $env:CMA_ZIP --clobber --repo $env:GITHUB_REPOSITORY
          }
 # deploy-cma:
 #   needs: promote-and-upload
