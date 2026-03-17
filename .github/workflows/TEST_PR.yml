@@ -52,7 +52,7 @@ jobs:
        id: create_branch
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}  # PAT with push + PR rights
        run: |
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
@@ -78,7 +78,7 @@ jobs:
      - name: Create PR from temp branch
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}  # required for gh CLI
        run: |
          $branch="${{ steps.create_branch.outputs.TEMP_BRANCH }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
