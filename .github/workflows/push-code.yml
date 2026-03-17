@@ -1,0 +1,57 @@
+name: Push Release Folder to PKG Branch
+on:
+ workflow_dispatch:
+permissions:
+ contents: write
+ actions: read
+jobs:
+ sync-release-folder:
+   runs-on: ubuntu-latest
+   steps:
+     - name: Set folder name
+       run: echo "FOLDER_NAME=EXT-001.CodeConfig" >> $GITHUB_ENV
+     - name: Checkout develop branch
+       uses: actions/checkout@v4
+       with:
+         ref: develop
+         fetch-depth: 0  # ensures full repo
+     - name: DEBUG - List develop branch
+       run: |
+         echo "=== ROOT OF DEVELOP ==="
+         ls -la
+         echo "=== CHECK FOLDER ==="
+         ls -la "$FOLDER_NAME" || echo "❌ Folder not found at root!"
+     - name: Verify folder exists
+       run: |
+         if [ ! -d "$FOLDER_NAME" ]; then
+           echo "❌ ERROR: Folder '$FOLDER_NAME' not found in develop"
+           exit 1
+         fi
+     - name: Copy folder to temp
+       run: |
+         rm -rf sync-folder
+         mkdir -p sync-folder
+         echo "Copying $FOLDER_NAME → sync-folder"
+         cp -a "$FOLDER_NAME"/. sync-folder/ || true
+         echo "=== TEMP FOLDER CONTENTS ==="
+         ls -la sync-folder || echo "❌ Temp still empty!"
+     - name: Checkout PKG branch
+       uses: actions/checkout@v4
+       with:
+         ref: PKG
+         fetch-depth: 0
+     - name: Copy into PKG branch
+       run: |
+         rm -rf "$FOLDER_NAME"
+         mkdir -p "$FOLDER_NAME"
+         echo "Copying sync-folder → $FOLDER_NAME"
+         cp -a sync-folder/. "$FOLDER_NAME"/ || true
+         echo "=== PKG TARGET CONTENTS ==="
+         ls -la "$FOLDER_NAME"
+     - name: Commit & Push
+       run: |
+         git config --global user.name "github-actions"
+         git config --global user.email "github-actions@github.com"
+         git add "$FOLDER_NAME"
+         git commit -m "Sync folder '$FOLDER_NAME' from develop to PKG" || echo "No changes to commit"
+         git push origin PKG

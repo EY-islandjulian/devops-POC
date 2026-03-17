@@ -1,29 +1,132 @@
-name: Auto Package
+name: Automated File Organization
 
 on:
-  push:
-    branches:
-      - main  # Trigger the action on push to the 'main' branch
-  workflow_dispatch:  # You can manually trigger this workflow as well
+  workflow_dispatch:
+    inputs:
+      folder_name:
+        description: 'Folder to organize'
+        required: true
+        default: 'myfolder'  # Default folder name, can be overridden by user input
 
 jobs:
-  zip:
-    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
+  organize-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Grant write access to the repository contents
+    env:
+      TARGET_FOLDER: ${{ github.event.inputs.folder_name }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3  # Check out the repository's code
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: Install zip (if necessary)
-        run: sudo apt-get install -y zip  # Install zip command if not available
+    - name: Set up Git user
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "github-actions@github.com"
 
-      - name: Zip contents of a folder
-        run: |
-          folder_name="H2OA_CM065.001"  # Specify the folder to zip
-          zip -r "H2OA_CM065.001.zip" "H2OA_CM065.001"  # Zip the folder
+    - name: Print current directory
+      run: |
+        echo "Current working directory:"
+        pwd  # Show the current directory to confirm we're at the root of the repo
+        echo "Listing files in current directory:"
+        ls -la  # List files at the root of the repository
 
-      - name: Upload zipped file as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: zipped-folder
-          path: main/  # Specify the path of the resulting zip file
+    - name: Organize files in a specific folder
+      run: |
+        echo "Organizing files in folder: $TARGET_FOLDER"
+        
+        # Create subfolders inside the target folder if they don't exist
+        mkdir -p "$TARGET_FOLDER/Technical_Design" "$TARGET_FOLDER/Functional_Design" "$TARGET_FOLDER/Scripts" "$TARGET_FOLDER/CMA"
+        
+        # Debug: Verify the contents of the target folder before moving files
+        echo "Listing contents of $TARGET_FOLDER before moving files:"
+        ls "$TARGET_FOLDER"
+        
+        # Move TD files that are not in subfolders
+        echo "Moving TD files"
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*TD*' -not -path "$TARGET_FOLDER/Technical_Design/*")
+        echo "Found TD files: $files"
+        
+        for file in $files; do
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to Technical_Design"
+          mv -f "$file" "$TARGET_FOLDER/Technical_Design/"  # Use mv (move), -f to overwrite if exists
+        done
+
+        # Move FD files that are not in subfolders
+        echo "Moving FD files"
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*FD*' -not -path "$TARGET_FOLDER/Functional_Design/*")
+        echo "Found FD files: $files"
+        
+        for file in $files; do
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to Functional_Design"
+          mv -f "$file" "$TARGET_FOLDER/Functional_Design/"  # Use mv (move), -f to overwrite if exists
+        done
+
+        # Move cm* files that are not in subfolders
+        echo "Moving cm* files"
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name 'cm*' -not -path "$TARGET_FOLDER/Scripts/*")
+        echo "Found cm* files: $files"
+        
+        for file in $files; do
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to Scripts"
+          mv -f "$file" "$TARGET_FOLDER/Scripts/"  # Use mv (move), -f to overwrite if exists
+        done
+
+        # Move .cma files that are not in subfolders
+        echo "Moving .cma files"
+        files=$(find "$TARGET_FOLDER" -maxdepth 1 -type f -name '*.cma' -not -path "$TARGET_FOLDER/CMA/*")
+        echo "Found .cma files: $files"
+        
+        for file in $files; do
+          # Move the file into the subfolder, overwriting if it already exists
+          echo "Moving $(basename $file) to CMA"
+          mv -f "$file" "$TARGET_FOLDER/CMA/"  # Use mv (move), -f to overwrite if exists
+        done
+
+    - name: Cleanup unorganized files
+      run: |
+        # Delete any files that have been moved and are no longer needed in the root
+        echo "Cleaning up unorganized files in $TARGET_FOLDER"
+        
+        # Find and delete files only in the root directory that are not in subfolders
+        find "$TARGET_FOLDER" -maxdepth 1 -type f ! -name 'Technical_Design/*' ! -name 'Functional_Design/*' ! -name 'Scripts/*' ! -name 'CMA/*' -exec rm -f {} \;
+
+    - name: Stage file deletions and commit changes
+      run: |
+        # Stage the deletions so Git tracks them
+        echo "Staging deleted files"
+        
+        # Stage only the files that were deleted (root folder files, not subfolder)
+        # Make sure we don't stage subfolders
+        git rm -f $(find "$TARGET_FOLDER" -maxdepth 1 -type f ! -name 'Technical_Design/*' ! -name 'Functional_Design/*' ! -name 'Scripts/*' ! -name 'CMA/*') || true
+
+        # Stage the added files in subfolders
+        git add "$TARGET_FOLDER/Technical_Design/*" "$TARGET_FOLDER/Functional_Design/*" "$TARGET_FOLDER/Scripts/*" "$TARGET_FOLDER/CMA/*" || true
+        
+        # Commit the changes (move + deletions)
+        git commit -m "Organized files in $TARGET_FOLDER and removed unneeded files" || echo "No changes to commit"
+        
+        # Push the changes to the repository
+        git push origin HEAD:develop  # Push to the main branch (adjust if using a different branch)
+      env:
+        # GitHub token is automatically provided to authenticate the push
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: List organized files in specific folder (Final Check)
+      run: |
+        # List the contents of the subfolders in the target folder after the commit
+        echo "Files in $TARGET_FOLDER/Technical_Design:"
+        ls "$TARGET_FOLDER/Technical_Design/"
+        
+        echo "Files in $TARGET_FOLDER/Functional_Design:"
+        ls "$TARGET_FOLDER/Functional_Design/"
+        
+        echo "Files in $TARGET_FOLDER/Scripts:"
+        ls "$TARGET_FOLDER/Scripts/"
+        
+        echo "Files in $TARGET_FOLDER/CMA:"
+        ls "$TARGET_FOLDER/CMA/"

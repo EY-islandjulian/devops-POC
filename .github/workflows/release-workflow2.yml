@@ -1,0 +1,212 @@
+name: Release Build
+
+on:
+  release:
+    types:
+      - created       # Trigger when a release is created
+      - edited        # Trigger when a release is updated (e.g., release notes or assets are updated)
+
+permissions:
+  contents: write  # Ensure the bot has write permissions to the repository
+  actions: read    # Allows actions to read metadata
+
+jobs:
+  auto-package:
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner for packaging step
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3  # Check out the repository
+
+      - name: Get release title
+        id: release-title
+        run: |
+          # Extract the release title from the event context
+          echo "RELEASE_TITLE=${{ github.event.release.name }}" >> $GITHUB_ENV
+          echo "Release title: ${{ github.event.release.name }}"
+
+      - name: Install zip (if necessary)
+        run: sudo apt-get install -y zip  # Install zip if it's not already available
+
+      - name: Verify folder existence before zipping
+        run: |
+          # Print out the contents of the repository to verify the folder's existence
+          echo "Listing contents of the repo before zipping:"
+          ls -l
+          
+          # Check if the folder you want to zip exists
+          folder_name="${{ env.RELEASE_TITLE }}"
+          if [ ! -d "$folder_name" ]; then
+            echo "Folder $folder_name does not exist!"
+            exit 1
+          else
+            echo "Folder $folder_name exists. Proceeding with zip."
+          fi
+
+      - name: Zip contents of a folder
+        id: zip-folder
+        run: |
+          # Use the release title as the folder name
+          folder_name="${{ env.RELEASE_TITLE }}"  # Folder name based on release title
+          echo "Folder name: $folder_name"
+          
+          # Zip the folder (replace with your actual folder if it exists)
+          zip -r "$folder_name.zip" "$folder_name"  # Zip the folder
+
+          # List the directory contents after zipping to confirm the .zip file is created
+          echo "Listing files after zipping:"
+          ls -l  # This will list all files in the current directory
+
+      - name: Set up Git for pushing
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Fetch the latest updates from the remote
+          git fetch origin
+          
+          # Check if the 'develop' branch exists, otherwise create it from the remote
+          git checkout develop || git checkout -b develop origin/develop  # If 'develop' doesn't exist locally, create it from the remote
+          
+          # List files in the directory to verify the .zip file exists
+          echo "Listing files before git add:"
+          ls -l  # This will show the file paths in the working directory
+
+          # Use a dynamic reference to the zip file name based on the folder name (e.g., EXT-0011.CodeConfig.zip)
+          folder_name="${{ env.RELEASE_TITLE }}"
+          zip_file="${folder_name}.zip"  # Construct the zip file name
+
+          # Check if the zip file exists and add it
+          if [ -f "$zip_file" ]; then
+            git add "$zip_file"
+            echo "Added $zip_file to commit."
+          else
+            echo "Error: $zip_file does not exist. Cannot add to Git."
+            exit 1  # Exit the job if the file is not found
+          fi
+
+          git commit -m "Add zip file $zip_file" || echo "No changes to commit"  # Commit if there's a change
+          git push origin develop  # Push the changes to the remote 'develop' branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub token for authentication
+
+    outputs:
+      folder_name: ${{ env.RELEASE_TITLE }}  # Pass the release title as the folder name output for later use in cma-deploy
+
+  cma-deploy:
+    runs-on: self-hosted  # Self-hosted runner for CMA migration
+    needs: auto-package  # Ensure this job runs only after 'auto-package' finishes
+    environment:
+      name: C2MDEV  # Use the 'C2MDEV' environment for approval
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get folder name from auto-package job
+        id: get-folder-name
+        run: |
+          # Get the folder name passed from the auto-package job
+          $folder_name = "${{ needs.auto-package.outputs.folder_name }}"
+          echo "Folder name received: $folder_name"
+          
+          # Construct the expected CMA file name (without the folder path)
+          $cma_file = "$folder_name.cma"  # Only the file name, no folder path
+          echo "CMA file expected: $cma_file"
+          
+          # Set the output to be used in the next step (only the file name, no full path)
+          echo "::set-output name=cmafile::$cma_file"  # Only the file name, not the full path
+
+      - name: Debugging the CMA file path
+        run: |
+          echo "Checking for CMA file pattern: ${{ steps.get-folder-name.outputs.cmafile }}"  # Print the expected file name
+
+      - name: Locate CMA file based on folder name
+        id: cma
+        shell: pwsh
+        run: |
+          # PowerShell: Define and assign the file name
+          $cma_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # Access the file name output
+          Write-Host "Looking for CMA file: $cma_file"
+          
+          # Search for the CMA file within the subfolder
+          $cma_file_path = Get-ChildItem -Recurse -Filter $cma_file | Select-Object -First 1  # Recursively find the .cma file
+          
+          if ($cma_file_path) {
+            Write-Host "Found CMA file: $($cma_file_path.FullName)"
+          } else {
+            Write-Host "CMA file not found for folder: $cma_file"
+            exit 1  # Exit if the file doesn't exist
+          }
+
+          # Output the file name for migration (only the file name, no full path)
+          echo "cmafile=$($cma_file_path.Name)" >> $env:GITHUB_OUTPUT  # Only the file name (no full path)
+          
+      - name: Copy CMA file to the import directory
+        run: |
+          # PowerShell syntax for variable assignment
+          $source_file = "${{ steps.get-folder-name.outputs.cmafile }}"  # This is just the file name (e.g., EXT-0011.CodeConfig.cma)
+
+          # Define the base path where the repository is checked out (adjust if necessary)
+          $repo_base_path = "C:\actions-runner\_work\devops-POC\devops-POC"
+
+          # Use Get-ChildItem to recursively search for the .cma file within the repo directory
+          $source_file_path = Get-ChildItem -Path $repo_base_path -Recurse -Filter $source_file | Select-Object -First 1
+
+          # Check if we found the file
+          if ($source_file_path) {
+              Write-Host "Found CMA file: $($source_file_path.FullName)"
+          } else {
+              Write-Host "CMA file not found: $source_file"
+              exit 1  # Exit the step if the file cannot be found
+          }
+
+          # Add a wait time to ensure the file copy operation completes
+          Write-Host "Waiting for 10 seconds to ensure the file is fully copied..."
+          Start-Sleep -Seconds 15  # Wait for 15 seconds
+          
+          # Define the destination path on the self-hosted runner
+          $destination_dir = "E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import"
+
+          # Check if the destination directory exists, and create it if it doesn't
+          if (-not (Test-Path $destination_dir)) {
+              Write-Host "Directory does not exist. Creating: $destination_dir"
+              New-Item -ItemType Directory -Path $destination_dir
+          } else {
+              Write-Host "Directory already exists: $destination_dir"
+          }
+
+          # Debugging the source file path
+          Write-Host "Source file path: $($source_file_path.FullName)"
+          
+          # Copy the CMA file to the import directory
+          Write-Host "Starting copying CMA file to the import Directory..."
+          Copy-Item -Path $source_file_path.FullName -Destination $destination_dir
+          Write-Host "Finished copying CMA file to the import Directory..."
+
+      - name: Locate CMA file in the import directory
+        run: |
+          $cma_file="${{ steps.get-folder-name.outputs.cmafile }}"
+          $destination_file="E:\app\ouaf\sploutput\EYAST-C2M29\F1_CMA_FILES\import\$($cma_file)"
+          echo "Looking for CMA file: $destination_file"
+
+          # Check if the file exists in the destination directory
+          if (Test-Path $destination_file) {
+            echo "Found CMA file: $destination_file"
+          } else {
+            echo "CMA file not found: $destination_file"
+            exit 1  # Exit if the file doesn't exist
+          }
+
+
+      - name: Run Migration Script
+        env:
+          username: ${{ secrets.C2M_USER }}
+          password: ${{ secrets.C2M_PASS }}
+          migration_import_api: ${{ secrets.C2M_API_URL }}
+        run: |
+          # Run the migration script and pass the CMA file name located in the previous step
+          pwsh ./run-migration.ps1 `
+            -Username "$env:username" `
+            -Password "$env:password" `
+            -MigrationApi "$env:migration_import_api" `
+            -CmaFile "${{ steps.cma.outputs.cmafile }}"  # Pass only the CMA file name to the script (no path)
