@@ -58,6 +58,9 @@ jobs:
          git fetch origin $target
          git fetch origin $source
          git checkout -B $tempBranch origin/$target
+         # Remove everything except .git
+         Get-ChildItem -Force | Where-Object { $_.Name -ne ".git" } | Remove-Item -Recurse -Force
+         # Bring only the CMA folder from source branch
          git checkout origin/$source -- $folder
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -65,7 +68,6 @@ jobs:
          git commit -m "Promote $folder ($tag)" --allow-empty
          git push origin $tempBranch --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
-
      - name: Ensure PR exists
        shell: pwsh
        env:
@@ -85,7 +87,8 @@ jobs:
            --jq '.[0].number'
          if ($existingPR) {
            Write-Host "PR already exists (#$existingPR). It will be updated automatically by the new commit."
-         } else {
+         }
+         else {
            Write-Host "Creating PR..."
            gh pr create `
              --base $target `
@@ -112,7 +115,6 @@ jobs:
          $zip="$folder-$tag.zip"
          Compress-Archive "$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
-
      - name: Tag and Release
        shell: pwsh
        env:
