@@ -99,7 +99,7 @@ jobs:
    steps:
      - uses: actions/checkout@v4
        with:
-         ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
+         ref: ${{ needs.promote-pr.outputs.TEMP_BRANCH }}
          fetch-depth: 0
      - name: Create CMA ZIP
        shell: pwsh
