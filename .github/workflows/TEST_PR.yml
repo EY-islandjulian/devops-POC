@@ -20,8 +20,7 @@ jobs:
  promote-pr:
    runs-on: ubuntu-latest
    outputs:
-     TEMP_BRANCH: ${{ steps.create_branch.outputs.TEMP_BRANCH }}
-     SOURCE_BRANCH: ${{ steps.resolve.outputs.SOURCE_BRANCH }}
+     TEMP_BRANCH: ${{ steps.branch.outputs.TEMP_BRANCH }}
      TARGET_ENV: ${{ steps.resolve.outputs.TARGET_ENV }}
      CMA_FOLDER: ${{ steps.extract.outputs.CMA_FOLDER }}
    steps:
@@ -35,9 +34,8 @@ jobs:
          $parts="${{ inputs.release_tag }}".Split("-",2)
          if ($parts.Length -lt 2){ throw "Invalid tag format" }
          $folder=$parts[1]
-         "CMA_FOLDER=$folder" | Out-File $env:GITHUB_ENV -Append
          "CMA_FOLDER=$folder" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Resolve promotion source and target
+     - name: Resolve promotion branches
        id: resolve
        shell: pwsh
        run: |
@@ -46,58 +44,58 @@ jobs:
            "C2MTEST" { $src="C2MDEV" }
            default { throw "Invalid promotion target" }
          }
-         "SOURCE_BRANCH=$src" | Out-File $env:GITHUB_OUTPUT -Append
+         "SOURCE_BRANCH=$src" | Out-File $env:GITHUB_ENV -Append
          "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Create temp branch with CMA folder
-       id: create_branch
+     - name: Create / Update temp branch
+       id: branch
        shell: pwsh
        run: |
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
-         $source="${{ steps.resolve.outputs.SOURCE_BRANCH }}"
-         $tempBranch="promote-$folder-$tag"
-         Write-Host "Fetching target branch $target..."
+         $source="$env:SOURCE_BRANCH"
+         $tempBranch="promote-$folder"
          git fetch origin $target
-         # Create temp branch from target branch
-         git checkout -b $tempBranch origin/$target
-         # Pull CMA folder from source branch
          git fetch origin $source
+         git checkout -B $tempBranch origin/$target
          git checkout origin/$source -- $folder
-         # Stage CMA folder
-         git add -A
-         # Commit changes
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
-         git commit -m "Promote CMA folder $folder for release $tag" --allow-empty
-         # Push temp branch
-         git push origin HEAD --force
+         git add -A
+         git commit -m "Promote $folder ($tag)" --allow-empty
+         git push origin $tempBranch --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Create PR from temp branch
+
+     - name: Ensure PR exists
        shell: pwsh
        env:
          GH_TOKEN: ${{ github.token }}
        run: |
-         $branch="${{ steps.create_branch.outputs.TEMP_BRANCH }}"
+         $branch="${{ steps.branch.outputs.TEMP_BRANCH }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
-         $tag="${{ inputs.release_tag }}"
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
-         $title="Promote CMA folder $folder ($tag) to $target"
-         $body="Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
-         # Check if an open PR already exists
-         $existingPR = gh pr list --base "$target" --head "$branch" --state open --json number --jq '.[0].number'
+         $tag="${{ inputs.release_tag }}"
+         $title="Promote $folder ($tag) to $target"
+         $body="Automated promotion for CMA folder $folder"
+         $existingPR = gh pr list `
+           --base $target `
+           --head $branch `
+           --state open `
+           --json number `
+           --jq '.[0].number'
          if ($existingPR) {
-             Write-Host "Open PR #$existingPR already exists. Skipping creation."
+           Write-Host "PR already exists (#$existingPR). It will be updated automatically by the new commit."
          } else {
-             Write-Host "Creating PR from $branch to $target..."
-             gh pr create --base "$target" --head "$branch" --title "$title" --body "$body"
+           Write-Host "Creating PR..."
+           gh pr create `
+             --base $target `
+             --head $branch `
+             --title "$title" `
+             --body "$body"
          }
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
-   outputs:
-     TARGET_ENV: ${{ needs.promote-pr.outputs.TARGET_ENV }}
-     CMA_FOLDER: ${{ needs.promote-pr.outputs.CMA_FOLDER }}
    steps:
      - uses: actions/checkout@v4
        with:
@@ -107,64 +105,55 @@ jobs:
        shell: pwsh
        run: |
          $folder="${{ needs.promote-pr.outputs.CMA_FOLDER }}"
-         if (-not (Test-Path $folder)) { throw "Folder '$folder' does not exist." }
          $tag="${{ inputs.release_tag }}"
+         if (-not (Test-Path $folder)) {
+           throw "Folder '$folder' does not exist."
+         }
          $zip="$folder-$tag.zip"
          Compress-Archive "$folder/*" $zip -Force
          "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
+
      - name: Tag and Release
        shell: pwsh
        env:
          GH_TOKEN: ${{ github.token }}
        run: |
          $tag="${{ inputs.release_tag }}"
-         $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
          git fetch origin --tags
-         if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
-             if (-not (git tag -l "$tag")) {
-                 git tag $tag
-                 git push origin $tag
-             }
+         if (-not (git tag -l "$tag")) {
+           git tag $tag
+           git push origin $tag
          }
-         $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+         $releaseExists = gh release view $tag 2>$null
          if (-not $releaseExists) {
-             gh release create $tag $env:CMA_ZIP --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
-         } else {
-             gh release upload $tag $env:CMA_ZIP --clobber --repo $env:GITHUB_REPOSITORY
+           gh release create $tag $env:CMA_ZIP `
+             --title "$tag" `
+             --notes "Automated CMA Release"
          }
-# deploy-cma:
-#   needs: promote-and-upload
-#   runs-on: ubuntu-latest
-#   steps:
-#     - name: Disabled temporarily
-#       run: echo "deploy-cma job is disabled for now"
-# apply-import:
-#   needs: deploy-cma
-#   runs-on: ubuntu-latest
-#   steps:
-#     - name: Disabled temporarily
-#       run: echo "apply-import job is disabled for now"
+         else {
+           gh release upload $tag $env:CMA_ZIP --clobber
+         }
  post-deploy:
    needs:
-   - promote-and-upload
-   - promote-pr
+     - promote-and-upload
+     - promote-pr
    runs-on: ubuntu-latest
    if: always()
    steps:
-   - uses: actions/checkout@v4
-   - name: Mark deployment SUCCESS
-     if: success()
-     run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
-   - name: Mark deployment FAILED
-     if: failure()
-     run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
-   - name: Update Release Notes
-     shell: pwsh
-     env:
-       GH_TOKEN: ${{ github.token }}
-     run: |
-       pwsh ./Scripts/update_release_notes.ps1 `
-         -ReleaseTag "${{ github.event.inputs.release_tag }}" `
-         -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
-         -DeployStatus $env:DEPLOY_STATUS `
-         -Repo $env:GITHUB_REPOSITORY
+     - uses: actions/checkout@v4
+     - name: Mark SUCCESS
+       if: success()
+       run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
+     - name: Mark FAILED
+       if: failure()
+       run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
+     - name: Update Release Notes
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ github.token }}
+       run: |
+         pwsh ./Scripts/update_release_notes.ps1 `
+           -ReleaseTag "${{ github.event.inputs.release_tag }}" `
+           -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
+           -DeployStatus $env:DEPLOY_STATUS `
+           -Repo $env:GITHUB_REPOSITORY
