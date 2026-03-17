@@ -47,28 +47,29 @@ jobs:
          }
          "SOURCE_BRANCH=$src" | Out-File $env:GITHUB_ENV -Append
          "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Create promotion branch for folder
+     - name: Create orphan promotion branch for folder
        id: tempbranch
        shell: pwsh
        run: |
          $source="$env:SOURCE_BRANCH"
-         $target="${{ steps.resolve.outputs.TARGET_ENV }}"
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
          $tempBranch="promote-$folder-$tag"
-         Write-Host "Fetching latest branches"
-         git fetch origin
-         Write-Host "Checkout target branch as base"
-         git checkout -b $tempBranch origin/$target
-         Write-Host "Pull ONLY the folder from source branch"
+         Write-Host "Fetching latest source branch"
+         git fetch origin $source
+         Write-Host "Create orphan branch $tempBranch"
+         git checkout --orphan $tempBranch
+         Write-Host "Remove all files from working tree"
+         git rm -rf . 2>$null
+         Write-Host "Checkout only folder $folder from $source"
          git checkout origin/$source -- $folder
-         if ((git status --porcelain).Length -eq 0) {
-           Write-Host "No folder changes to promote"
-           exit 0
+         if (-not (Test-Path $folder)) {
+           Write-Host "Folder $folder not found in source branch!"
+           exit 1
          }
          git add $folder
          git commit -m "Promote folder $folder for release $tag"
-         git push origin $tempBranch
+         git push origin $tempBranch --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Create Promotion Pull Request
        shell: pwsh
