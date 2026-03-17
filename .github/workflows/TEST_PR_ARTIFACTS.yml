@@ -47,31 +47,53 @@ jobs:
          }
          "SOURCE_BRANCH=$source" | Out-File $env:GITHUB_ENV -Append
          "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Download CMA ZIP artifact
-       uses: actions/download-artifact@v4
+     - name: Prepare CMA ZIP
+       id: prepare
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ github.token }}
+       run: |
+         $tag="${{ inputs.release_tag }}"
+         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+         if (-not $releaseExists) {
+             Write-Host "Release $tag not found. Creating initial release from source branch..."
+             git fetch origin ${{ steps.resolve.outputs.SOURCE_BRANCH }}
+             git checkout origin/${{ steps.resolve.outputs.SOURCE_BRANCH }} -- $folder
+             $zip="$folder-$tag.zip"
+             Compress-Archive "$folder/*" $zip -Force
+             gh release create $tag $zip --title "$tag" --notes "Initial deployment for CMA $folder ($tag)" --repo $env:GITHUB_REPOSITORY
+         } else {
+             Write-Host "Release $tag exists. Downloading CMA ZIP from release assets..."
+             gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*.zip" --dir "./"
+         }
+         $zipFile = Get-ChildItem *.zip | Where-Object { $_.Name -like "*$folder*" } | Select-Object -First 1
+         if (-not $zipFile) { throw "CMA ZIP not found in release assets." }
+         "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_ENV -Append
+         "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_OUTPUT -Append
+     - name: Upload CMA ZIP as artifact
+       uses: actions/upload-artifact@v4
        with:
          name: cma-zip
-         path: ./artifact
-     - name: Create temp branch with unzipped CMA folder
+         path: ${{ steps.prepare.outputs.CMA_ZIP }}
+     - name: Create temp branch with CMA ZIP
        id: create_branch
        shell: pwsh
        run: |
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
+         $zip="${{ steps.prepare.outputs.CMA_ZIP }}"
          $tempBranch="promote-$folder-$tag"
          Write-Host "Fetching target branch $target..."
          git fetch origin $target
          git checkout -b $tempBranch origin/$target
-         # Unzip the artifact into the temp branch
-         $zipFile = Get-ChildItem ./artifact/*.zip | Select-Object -First 1
-         if (-not $zipFile) { throw "CMA ZIP artifact not found" }
-         Expand-Archive -Path $zipFile.FullName -DestinationPath "./$folder" -Force
-         # Stage and commit the folder
+         # Unzip directly into root of temp branch
+         Expand-Archive -LiteralPath $zip -DestinationPath "./$folder" -Force
          git add "$folder"
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
-         git commit -m "Promote CMA folder $folder ($tag) to $target" --allow-empty
+         git commit -m "Promote CMA $folder ($tag) to $target" --allow-empty
          git push origin HEAD --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Create PR from temp branch
