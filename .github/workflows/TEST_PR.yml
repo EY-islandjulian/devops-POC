@@ -67,6 +67,9 @@ jobs:
            Write-Host "Folder $folder not found in source branch!"
            exit 1
          }
+         # ⚡ Fix Git commit identity
+         git config user.name "github-actions[bot]"
+         git config user.email "github-actions[bot]@users.noreply.github.com"
          git add $folder
          git commit -m "Promote folder $folder for release $tag"
          git push origin $tempBranch --force
