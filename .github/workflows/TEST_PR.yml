@@ -51,8 +51,6 @@ jobs:
      - name: Create temp branch with CMA folder
        id: create_branch
        shell: pwsh
-       env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}  # PAT with push + PR rights
        run: |
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
@@ -78,22 +76,24 @@ jobs:
      - name: Create PR from temp branch
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}  # required for gh CLI
+         GH_TOKEN: ${{ github.token }}   # <--- Use built-in token automatically
        run: |
          $branch="${{ steps.create_branch.outputs.TEMP_BRANCH }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
          $tag="${{ inputs.release_tag }}"
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         $title="Promote CMA folder $folder ($tag) to $target"
+         $body="Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
          Write-Host "Creating PR from $branch to $target"
          gh pr create `
            --base "$target" `
            --head "$branch" `
-           --title "Promote CMA folder $folder ($tag) to $target" `
-           --body "Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
-     # PR auto merge commented out for now
+           --title "$title" `
+           --body "$body"
+     # PR auto merge commented out
      # - name: Enable PR Auto Merge
      #   env:
-     #     GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+     #     GH_TOKEN: ${{ github.token }}
      #   run: |
      #     PR=$(gh pr list --base "${{ steps.resolve.outputs.TARGET_ENV }}" --head "${{ steps.resolve.outputs.SOURCE_BRANCH }}" --json number --jq '.[0].number')
      #     gh pr merge $PR --auto --squash
@@ -119,7 +119,7 @@ jobs:
      - name: Tag and Release
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+         GH_TOKEN: ${{ github.token }}
        run: |
          $tag="${{ inputs.release_tag }}"
          $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
