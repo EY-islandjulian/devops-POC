@@ -48,24 +48,27 @@ jobs:
          }
          "SOURCE_BRANCH=$src" | Out-File $env:GITHUB_OUTPUT -Append
          "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Create temp branch with only CMA folder
+     - name: Create temp branch with CMA folder
        id: create_branch
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }} # PAT with write access
+         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
        run: |
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
          $tag="${{ inputs.release_tag }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
+         $source="${{ steps.resolve.outputs.SOURCE_BRANCH }}"
          $tempBranch="promote-$folder-$tag"
-         Write-Host "Fetching target branch $target and creating temp branch $tempBranch..."
+         Write-Host "Fetching target branch $target..."
          git fetch origin $target
+         # Create temp branch from target branch
          git checkout -b $tempBranch origin/$target
-         # Remove all files except the CMA folder
-         Get-ChildItem -Path . -Recurse | Where-Object { $_.FullName -notmatch [regex]::Escape((Resolve-Path $folder).Path) } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+         # Pull CMA folder from source branch (C2MDEV)
+         git fetch origin $source
+         git checkout origin/$source -- $folder
          # Stage CMA folder
          git add -A
-         # Commit changes (allow empty if folder identical)
+         # Commit changes
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
          git commit -m "Promote CMA folder $folder for release $tag" --allow-empty
