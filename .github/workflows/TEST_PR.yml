@@ -66,17 +66,15 @@ jobs:
          git checkout origin/$source -- $folder
          # Stage CMA folder
          git add -A
-         # Commit changes
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
          git commit -m "Promote CMA folder $folder for release $tag" --allow-empty
-         # Push temp branch
          git push origin HEAD --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
      - name: Create PR from temp branch
        shell: pwsh
        env:
-         GH_TOKEN: ${{ github.token }}   # <--- Use built-in token automatically
+         GH_TOKEN: ${{ github.token }}
        run: |
          $branch="${{ steps.create_branch.outputs.TEMP_BRANCH }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
@@ -85,18 +83,7 @@ jobs:
          $title="Promote CMA folder $folder ($tag) to $target"
          $body="Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
          Write-Host "Creating PR from $branch to $target"
-         gh pr create `
-           --base "$target" `
-           --head "$branch" `
-           --title "$title" `
-           --body "$body"
-     # PR auto merge commented out
-     # - name: Enable PR Auto Merge
-     #   env:
-     #     GH_TOKEN: ${{ github.token }}
-     #   run: |
-     #     PR=$(gh pr list --base "${{ steps.resolve.outputs.TARGET_ENV }}" --head "${{ steps.resolve.outputs.SOURCE_BRANCH }}" --json number --jq '.[0].number')
-     #     gh pr merge $PR --auto --squash
+         gh pr create --base "$target" --head "$branch" --title "$title" --body "$body"
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
@@ -136,18 +123,6 @@ jobs:
          } else {
            gh release upload $tag $env:CMA_ZIP --clobber --repo $env:GITHUB_REPOSITORY
          }
- # deploy-cma:
- #   needs: promote-and-upload
- #   runs-on: ubuntu-latest
- #   steps:
- #     - name: Disabled temporarily
- #       run: echo "deploy-cma job is disabled for now"
- # apply-import:
- #   needs: deploy-cma
- #   runs-on: ubuntu-latest
- #   steps:
- #     - name: Disabled temporarily
- #       run: echo "apply-import job is disabled for now"
  post-deploy:
    needs:
      - promote-and-upload
