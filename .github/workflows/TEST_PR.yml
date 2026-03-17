@@ -68,16 +68,16 @@ jobs:
            --head "$source" `
            --title "$title" `
            --body "$body"
-     - name: Enable PR Auto Merge
-       env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       run: |
-         PR=$(gh pr list \
-           --base "${{ steps.resolve.outputs.TARGET_ENV }}" \
-           --head "${{ steps.resolve.outputs.SOURCE_BRANCH }}" \
-           --json number \
-           --jq '.[0].number')
-         gh pr merge $PR --auto --squash
+#     - name: Enable PR Auto Merge
+#       env:
+#         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       run: |
+#         PR=$(gh pr list \
+#           --base "${{ steps.resolve.outputs.TARGET_ENV }}" \
+#           --head "${{ steps.resolve.outputs.SOURCE_BRANCH }}" \
+#           --json number \
+#           --jq '.[0].number')
+#         gh pr merge $PR --auto --squash
 
  promote-and-upload:
    needs: promote-pr
