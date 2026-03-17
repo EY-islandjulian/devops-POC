@@ -1,0 +1,175 @@
+name: TEST ARTIFACTS - Promote and Deploy CMA
+on:
+ workflow_dispatch:
+   inputs:
+     release_tag:
+       description: "Release tag (v1.0.0-FOLDER)"
+       required: true
+       type: string
+     target_env:
+       description: "Target environment"
+       required: true
+       type: choice
+       options:
+         - C2MTEST
+permissions:
+ contents: write
+ pull-requests: write
+ actions: read
+jobs:
+ promote-pr:
+   runs-on: ubuntu-latest
+   outputs:
+     TEMP_BRANCH: ${{ steps.create_branch.outputs.TEMP_BRANCH }}
+     TARGET_ENV: ${{ steps.resolve.outputs.TARGET_ENV }}
+     CMA_FOLDER: ${{ steps.extract.outputs.CMA_FOLDER }}
+     CMA_ZIP: ${{ steps.prepare.outputs.CMA_ZIP }}
+   steps:
+     - uses: actions/checkout@v4
+       with:
+         fetch-depth: 0
+     # Extract folder from release tag
+     - name: Extract CMA folder
+       id: extract
+       shell: pwsh
+       run: |
+         $parts="${{ inputs.release_tag }}".Split("-",2)
+         if ($parts.Length -lt 2){ throw "Invalid tag format" }
+         $folder=$parts[1]
+         "CMA_FOLDER=$folder" | Out-File $env:GITHUB_ENV -Append
+         "CMA_FOLDER=$folder" | Out-File $env:GITHUB_OUTPUT -Append
+     # Resolve source/target environments
+     - name: Resolve target
+       id: resolve
+       shell: pwsh
+       run: |
+         $target="${{ inputs.target_env }}"
+         switch ($target) {
+           "C2MTEST" { $source="C2MDEV" }
+           default { throw "Invalid promotion target" }
+         }
+         "SOURCE_BRANCH=$source" | Out-File $env:GITHUB_ENV -Append
+         "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
+     # Download CMA ZIP artifact from source branch release
+     - name: Prepare CMA ZIP
+       id: prepare
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         $tag="${{ inputs.release_tag }}"
+         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         Write-Host "Downloading CMA ZIP for $tag from release assets..."
+         gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*.zip" --dir "./"
+         $zipFile = Get-ChildItem *.zip | Where-Object { $_.Name -like "*$folder*" } | Select-Object -First 1
+         if (-not $zipFile) { throw "CMA ZIP not found in release assets." }
+         "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_ENV -Append
+         "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_OUTPUT -Append
+     # Create temp branch from target and commit CMA ZIP
+     - name: Create temp branch with CMA ZIP
+       id: create_branch
+       shell: pwsh
+       run: |
+         $target="${{ steps.resolve.outputs.TARGET_ENV }}"
+         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         $tag="${{ inputs.release_tag }}"
+         $zip="${{ steps.prepare.outputs.CMA_ZIP }}"
+         $tempBranch="promote-$folder-$tag"
+         Write-Host "Fetching target branch $target..."
+         git fetch origin $target
+         git checkout -b $tempBranch origin/$target
+         # Create deployments folder if not exists
+         $deployDir="deployments/$target"
+         if (-not (Test-Path $deployDir)) { New-Item -ItemType Directory -Path $deployDir | Out-Null }
+         # Copy ZIP into deployments folder
+         Copy-Item $zip $deployDir/
+         # Stage and commit
+         git add $deployDir/$zip
+         git config user.name "github-actions[bot]"
+         git config user.email "github-actions[bot]@users.noreply.github.com"
+         git commit -m "Promote CMA $folder ($tag) to $target" --allow-empty
+         git push origin HEAD --force
+         "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
+     # Create PR
+     - name: Create PR from temp branch
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       run: |
+         $branch="${{ steps.create_branch.outputs.TEMP_BRANCH }}"
+         $target="${{ steps.resolve.outputs.TARGET_ENV }}"
+         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         $tag="${{ inputs.release_tag }}"
+         $title="Promote CMA folder $folder ($tag) to $target"
+         $body="Promotion request for CMA folder $folder from tag $tag.`nRollback: revert merge commit or redeploy previous release."
+         Write-Host "Creating PR from $branch to $target..."
+         gh pr create --base "$target" --head "$branch" --title "$title" --body "$body"
+ promote-and-upload:
+   needs: promote-pr
+   runs-on: ubuntu-latest
+   outputs:
+     TARGET_ENV: ${{ needs.promote-pr.outputs.TARGET_ENV }}
+     CMA_FOLDER: ${{ needs.promote-pr.outputs.CMA_FOLDER }}
+     CMA_ZIP: ${{ needs.promote-pr.outputs.CMA_ZIP }}
+   steps:
+     - uses: actions/checkout@v4
+       with:
+         ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
+         fetch-depth: 0
+     - name: Tag and Release
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ github.token }}
+       run: |
+         $tag="${{ inputs.release_tag }}"
+         $zip="${{ needs.promote-pr.outputs.CMA_ZIP }}"
+         git fetch origin --tags
+         # Apply tag if TEST or UAT
+         $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
+         if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
+             if (-not (git tag -l "$tag")) {
+                 git tag $tag
+                 git push origin $tag
+             }
+         }
+         $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+         if (-not $releaseExists) {
+             gh release create $tag $zip --title "$tag" --notes "Automated release for CMA $tag" --repo $env:GITHUB_REPOSITORY
+         } else {
+             gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
+         }
+# deploy-cma:
+#   needs: promote-and-upload
+#   runs-on: ubuntu-latest
+#   steps:
+#     - name: Disabled temporarily
+#       run: echo "deploy-cma job is disabled for now"
+# apply-import:
+#   needs: deploy-cma
+#   runs-on: ubuntu-latest
+#   steps:
+#     - name: Disabled temporarily
+#       run: echo "apply-import job is disabled for now"
+  post-deploy:
+  needs:
+   - promote-and-upload
+   - promote-pr
+ runs-on: ubuntu-latest
+ if: always()
+ steps:
+   - uses: actions/checkout@v4
+   - name: Mark deployment SUCCESS
+     if: success()
+     run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
+   - name: Mark deployment FAILED
+     if: failure()
+     run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
+   - name: Update Release Notes
+     shell: pwsh
+     env:
+       GH_TOKEN: ${{ github.token }}
+     run: |
+       pwsh ./Scripts/update_release_notes.ps1 `
+         -ReleaseTag "${{ github.event.inputs.release_tag }}" `
+         -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
+         -DeployStatus $env:DEPLOY_STATUS `
