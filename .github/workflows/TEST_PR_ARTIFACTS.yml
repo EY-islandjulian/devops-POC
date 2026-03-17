@@ -138,6 +138,7 @@ jobs:
          } else {
              gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
          }
+       
 # deploy-cma:
 #   needs: promote-and-upload
 #   runs-on: ubuntu-latest
@@ -150,13 +151,13 @@ jobs:
 #   steps:
 #     - name: Disabled temporarily
 #       run: echo "apply-import job is disabled for now"
-  post-deploy:
+ post-deploy:
   needs:
    - promote-and-upload
    - promote-pr
- runs-on: ubuntu-latest
- if: always()
- steps:
+  runs-on: ubuntu-latest
+  if: always()
+  steps:
    - uses: actions/checkout@v4
    - name: Mark deployment SUCCESS
      if: success()
