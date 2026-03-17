@@ -55,6 +55,9 @@ jobs:
        run: |
          $tag="${{ inputs.release_tag }}"
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         # Remove existing zips to avoid conflicts
+         Remove-Item *.zip -ErrorAction Ignore
+         # Check if release exists
          $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
          if (-not $releaseExists) {
              Write-Host "Release $tag not found. Creating initial release from source branch..."
@@ -65,18 +68,13 @@ jobs:
              gh release create $tag $zip --title "$tag" --notes "Initial deployment for CMA $folder ($tag)" --repo $env:GITHUB_REPOSITORY
          } else {
              Write-Host "Release $tag exists. Downloading CMA ZIP from release assets..."
-             gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*.zip" --dir "./"
+             gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*$folder*.zip" --dir "./" --clobber
          }
          $zipFile = Get-ChildItem *.zip | Where-Object { $_.Name -like "*$folder*" } | Select-Object -First 1
          if (-not $zipFile) { throw "CMA ZIP not found in release assets." }
          "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_ENV -Append
          "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Upload CMA ZIP as artifact
-       uses: actions/upload-artifact@v4
-       with:
-         name: cma-zip
-         path: ${{ steps.prepare.outputs.CMA_ZIP }}
-     - name: Create temp branch with CMA ZIP
+     - name: Create temp branch with CMA folder
        id: create_branch
        shell: pwsh
        run: |
@@ -88,9 +86,10 @@ jobs:
          Write-Host "Fetching target branch $target..."
          git fetch origin $target
          git checkout -b $tempBranch origin/$target
-         # Unzip directly into root of temp branch
-         Expand-Archive -LiteralPath $zip -DestinationPath "./$folder" -Force
-         git add "$folder"
+         # Unzip the CMA into temp branch root
+         Expand-Archive $zip -DestinationPath "./$folder" -Force
+         # Stage and commit
+         git add -A
          git config user.name "github-actions[bot]"
          git config user.email "github-actions[bot]@users.noreply.github.com"
          git commit -m "Promote CMA $folder ($tag) to $target" --allow-empty
@@ -124,14 +123,14 @@ jobs:
        uses: actions/download-artifact@v4
        with:
          name: cma-zip
-         path: ./  # downloads to current directory
+         path: ./
      - name: Tag and Release
        shell: pwsh
        env:
          GH_TOKEN: ${{ github.token }}
        run: |
          $tag="${{ inputs.release_tag }}"
-         $zip = Get-ChildItem *.zip | Select-Object -First 1
+         $zip = Get-ChildItem *.zip | Where-Object { $_.Name -like "*${{ needs.promote-pr.outputs.CMA_FOLDER }}*" } | Select-Object -First 1
          git fetch origin --tags
          $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
          if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
@@ -160,25 +159,25 @@ jobs:
 #       run: echo "apply-import job is disabled for now"
  post-deploy:
    needs:
-     - promote-and-upload
-     - promote-pr
+   - promote-and-upload
+   - promote-pr
    runs-on: ubuntu-latest
    if: always()
    steps:
-     - uses: actions/checkout@v4
-     - name: Mark deployment SUCCESS
-       if: success()
-       run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
-     - name: Mark deployment FAILED
-       if: failure()
-       run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
-     - name: Update Release Notes
-       shell: pwsh
-       env:
-         GH_TOKEN: ${{ github.token }}
-       run: |
-         pwsh ./Scripts/update_release_notes.ps1 `
-           -ReleaseTag "${{ github.event.inputs.release_tag }}" `
-           -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
-           -DeployStatus $env:DEPLOY_STATUS `
-           -Repo $env:GITHUB_REPOSITORY
+   - uses: actions/checkout@v4
+   - name: Mark deployment SUCCESS
+     if: success()
+     run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
+   - name: Mark deployment FAILED
+     if: failure()
+     run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
+   - name: Update Release Notes
+     shell: pwsh
+     env:
+       GH_TOKEN: ${{ github.token }}
+     run: |
+       pwsh ./Scripts/update_release_notes.ps1 `
+         -ReleaseTag "${{ github.event.inputs.release_tag }}" `
+         -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
+         -DeployStatus $env:DEPLOY_STATUS `
+         -Repo $env:GITHUB_REPOSITORY
