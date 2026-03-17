@@ -1,4 +1,4 @@
-name: TEST ARTIFACTS - Promote and Deploy CMA
+name: Promote and Deploy CMA (Artifact-Based)
 on:
  workflow_dispatch:
    inputs:
@@ -28,7 +28,6 @@ jobs:
      - uses: actions/checkout@v4
        with:
          fetch-depth: 0
-     # Extract folder from release tag
      - name: Extract CMA folder
        id: extract
        shell: pwsh
@@ -38,7 +37,6 @@ jobs:
          $folder=$parts[1]
          "CMA_FOLDER=$folder" | Out-File $env:GITHUB_ENV -Append
          "CMA_FOLDER=$folder" | Out-File $env:GITHUB_OUTPUT -Append
-     # Resolve source/target environments
      - name: Resolve target
        id: resolve
        shell: pwsh
@@ -50,22 +48,33 @@ jobs:
          }
          "SOURCE_BRANCH=$source" | Out-File $env:GITHUB_ENV -Append
          "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
-     # Download CMA ZIP artifact from source branch release
      - name: Prepare CMA ZIP
        id: prepare
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         GH_TOKEN: ${{ github.token }}
        run: |
          $tag="${{ inputs.release_tag }}"
          $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
-         Write-Host "Downloading CMA ZIP for $tag from release assets..."
-         gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*.zip" --dir "./"
+         # Check if release exists
+         $releaseExists = gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+         if (-not $releaseExists) {
+             Write-Host "Release $tag not found. Creating initial release from source branch..."
+             # Zip CMA folder from source branch
+             git fetch origin ${{ steps.resolve.outputs.SOURCE_BRANCH }}
+             git checkout origin/${{ steps.resolve.outputs.SOURCE_BRANCH }} -- $folder
+             $zip="$folder-$tag.zip"
+             Compress-Archive "$folder/*" $zip -Force
+             # Create release with this ZIP
+             gh release create $tag $zip --title "$tag" --notes "Initial deployment for CMA $folder ($tag)" --repo $env:GITHUB_REPOSITORY
+         } else {
+             Write-Host "Release $tag exists. Downloading CMA ZIP from release assets..."
+             gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "*.zip" --dir "./"
+         }
          $zipFile = Get-ChildItem *.zip | Where-Object { $_.Name -like "*$folder*" } | Select-Object -First 1
          if (-not $zipFile) { throw "CMA ZIP not found in release assets." }
          "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_ENV -Append
          "CMA_ZIP=$($zipFile.Name)" | Out-File $env:GITHUB_OUTPUT -Append
-     # Create temp branch from target and commit CMA ZIP
      - name: Create temp branch with CMA ZIP
        id: create_branch
        shell: pwsh
@@ -90,11 +99,10 @@ jobs:
          git commit -m "Promote CMA $folder ($tag) to $target" --allow-empty
          git push origin HEAD --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
-     # Create PR
      - name: Create PR from temp branch
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         GH_TOKEN: ${{ github.token }}
        run: |
          $branch="${{ steps.create_branch.outputs.TEMP_BRANCH }}"
          $target="${{ steps.resolve.outputs.TARGET_ENV }}"
@@ -124,7 +132,6 @@ jobs:
          $tag="${{ inputs.release_tag }}"
          $zip="${{ needs.promote-pr.outputs.CMA_ZIP }}"
          git fetch origin --tags
-         # Apply tag if TEST or UAT
          $target="${{ needs.promote-pr.outputs.TARGET_ENV }}"
          if ($target -eq "C2MTEST" -or $target -eq "C2MUAT") {
              if (-not (git tag -l "$tag")) {
@@ -138,7 +145,7 @@ jobs:
          } else {
              gh release upload $tag $zip --clobber --repo $env:GITHUB_REPOSITORY
          }
-       
+         
 # deploy-cma:
 #   needs: promote-and-upload
 #   runs-on: ubuntu-latest
@@ -151,13 +158,14 @@ jobs:
 #   steps:
 #     - name: Disabled temporarily
 #       run: echo "apply-import job is disabled for now"
+
  post-deploy:
-  needs:
+   needs:
    - promote-and-upload
    - promote-pr
-  runs-on: ubuntu-latest
-  if: always()
-  steps:
+   runs-on: ubuntu-latest
+   if: always()
+   steps:
    - uses: actions/checkout@v4
    - name: Mark deployment SUCCESS
      if: success()
@@ -174,3 +182,4 @@ jobs:
          -ReleaseTag "${{ github.event.inputs.release_tag }}" `
          -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
          -DeployStatus $env:DEPLOY_STATUS `
+         -Repo $env:GITHUB_REPOSITORY
