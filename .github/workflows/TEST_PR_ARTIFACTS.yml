@@ -122,7 +122,7 @@ jobs:
          ref: ${{ needs.promote-pr.outputs.TARGET_ENV }}
          fetch-depth: 0
      - name: Download CMA ZIP artifact
-       uses: actions/download-artifact@v3
+       uses: actions/download-artifact@v4
        with:
          name: cma-zip
          path: ./  # downloads to current directory
