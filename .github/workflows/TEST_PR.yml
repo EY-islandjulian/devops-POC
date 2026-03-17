@@ -165,7 +165,7 @@ jobs:
      - name: Update Release Notes
        shell: pwsh
        env:
-         GH_TOKEN: ${{ secrets.GH_PUSH_TOKEN }}
+         GH_TOKEN: ${{ github.token }}
        run: |
          pwsh ./Scripts/update_release_notes.ps1 `
            -ReleaseTag "${{ github.event.inputs.release_tag }}" `
