@@ -1,4 +1,4 @@
-name: DO NOT USE Promote and Deploy CMA
+name: Promote and Create Pull Request
 on:
  workflow_dispatch:
    inputs:
