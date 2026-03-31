@@ -1,0 +1,169 @@
+name: TESTTT Promote and Create Pull Request
+on:
+ workflow_dispatch:
+   inputs:
+     release_tag:
+       description: "Release tag (v1.0.0-FOLDER)"
+       required: true
+       type: string
+     target_env:
+       description: "Target environment"
+       required: true
+       type: choice
+       options:
+         - CCSDEV
+         - C2MTEST
+permissions:
+ contents: write
+ pull-requests: write
+ actions: read
+jobs:
+ promote-pr:
+   runs-on: ubuntu-latest
+   outputs:
+     TEMP_BRANCH: ${{ steps.branch.outputs.TEMP_BRANCH }}
+     TARGET_ENV: ${{ steps.resolve.outputs.TARGET_ENV }}
+     CMA_FOLDER: ${{ steps.extract.outputs.CMA_FOLDER }}
+   steps:
+     - uses: actions/checkout@v4
+       with:
+         fetch-depth: 0
+     - name: Extract CMA folder
+       id: extract
+       shell: pwsh
+       run: |
+         $parts="${{ inputs.release_tag }}".Split("-",2)
+         if ($parts.Length -lt 2){ throw "Invalid tag format" }
+         $folder=$parts[1]
+         "CMA_FOLDER=$folder" | Out-File $env:GITHUB_OUTPUT -Append
+     - name: Resolve promotion branches
+       id: resolve
+       shell: pwsh
+       run: |
+         $target="${{ inputs.target_env }}"
+         switch ($target) {
+           "C2MTEST" { $src="CCSDEV" }
+           "CCSDEV" { $src="CCSDEV" }
+           default { throw "Invalid promotion target" }
+         }
+         "SOURCE_BRANCH=$src" | Out-File $env:GITHUB_ENV -Append
+         "TARGET_ENV=$target" | Out-File $env:GITHUB_OUTPUT -Append
+     - name: Create / Update temp branch
+       id: branch
+       shell: pwsh
+       run: |
+         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         $tag="${{ inputs.release_tag }}"
+         $target="${{ steps.resolve.outputs.TARGET_ENV }}"
+         $source="$env:SOURCE_BRANCH"
+         $tempBranch="promote-$folder"
+         git fetch origin $target
+         git fetch origin $source
+         git checkout -B $tempBranch origin/$target
+         git checkout origin/$source -- $folder
+         git config user.name "github-actions[bot]"
+         git config user.email "github-actions[bot]@users.noreply.github.com"
+         git add -A
+         git commit -m "Promote $folder ($tag)" --allow-empty
+         git push origin $tempBranch --force
+         "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
+     - name: Create PR
+       if: ${{ steps.resolve.outputs.TARGET_ENV == 'CCSDEV' }}
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ github.token }}
+       run: |
+         $branch="${{ steps.branch.outputs.TEMP_BRANCH }}"
+         $target="${{ steps.resolve.outputs.TARGET_ENV }}"
+         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
+         $tag="${{ inputs.release_tag }}"
+         $title="Promote $folder ($tag) to $target"
+         $body="Automated promotion for CMA folder $folder"
+         $existingPR = gh pr list `
+           --base $target `
+           --head $branch `
+           --state open `
+           --json number `
+           --jq '.[0].number'
+         if ($existingPR) {
+           Write-Host "PR already exists (#$existingPR). It will be updated automatically by the new commit."
+         } else {
+           Write-Host "Creating PR..."
+           gh pr create `
+             --base $target `
+             --head $branch `
+             --title "$title" `
+             --body "$body"
+         }
+     - name: Create PR via peter-evans (non-DEV)
+       if: ${{ steps.resolve.outputs.TARGET_ENV != 'CCSDEV' }}
+       uses: peter-evans/create-pull-request@v6
+       with:
+         token: ${{ secrets.GITHUB_TOKEN }}
+         base: ${{ steps.resolve.outputs.TARGET_ENV }}
+         branch: ${{ steps.branch.outputs.TEMP_BRANCH }}
+         title: "Promote ${{ steps.extract.outputs.CMA_FOLDER }} (${{ github.event.inputs.release_tag }}) to ${{ steps.resolve.outputs.TARGET_ENV }}"
+         body: "Automated promotion for CMA folder ${{ steps.extract.outputs.CMA_FOLDER }}"
+         reviewers: "" # empty = use CODEOWNERS automatically
+ promote-and-upload:
+   needs: promote-pr
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v4
+       with:
+         ref: ${{ needs.promote-pr.outputs.TEMP_BRANCH }}
+         fetch-depth: 0
+     - name: Create CMA ZIP
+       shell: pwsh
+       run: |
+         $folder="${{ needs.promote-pr.outputs.CMA_FOLDER }}"
+         $tag="${{ github.event.inputs.release_tag }}"
+         if (-not (Test-Path $folder)) {
+           throw "Folder '$folder' does not exist."
+         }
+         $zip="$folder-$tag.zip"
+         Compress-Archive "$folder/*" $zip -Force
+         "CMA_ZIP=$zip" | Out-File $env:GITHUB_ENV -Append
+     - name: Tag and Release
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ github.token }}
+       run: |
+         $tag="${{ github.event.inputs.release_tag }}"
+         git fetch origin --tags
+         if (-not (git tag -l "$tag")) {
+           git tag $tag
+           git push origin $tag
+         }
+         $releaseExists = gh release view $tag 2>$null
+         if (-not $releaseExists) {
+           gh release create $tag $env:CMA_ZIP `
+             --title "$tag" `
+             --notes "Automated CMA Release"
+         } else {
+           gh release upload $tag $env:CMA_ZIP --clobber
+         }
+ post-deploy:
+   needs:
+     - promote-and-upload
+     - promote-pr
+   runs-on: ubuntu-latest
+   if: always()
+   steps:
+     - uses: actions/checkout@v4
+     - name: Mark SUCCESS
+       if: success()
+       run: echo "DEPLOY_STATUS=SUCCESS" >> $GITHUB_ENV
+     - name: Mark FAILED
+       if: failure()
+       run: echo "DEPLOY_STATUS=FAILED" >> $GITHUB_ENV
+     - name: Update Release Notes
+       shell: pwsh
+       env:
+         GH_TOKEN: ${{ github.token }}
+       run: |
+         pwsh ./Scripts/update_release_notes.ps1 `
+           -ReleaseTag "${{ github.event.inputs.release_tag }}" `
+           -TargetEnv "${{ needs.promote-pr.outputs.TARGET_ENV }}" `
+           -DeployStatus $env:DEPLOY_STATUS `
+           -Repo $env:GITHUB_REPOSITORY
