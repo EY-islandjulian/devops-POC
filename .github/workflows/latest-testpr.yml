@@ -12,7 +12,9 @@ on:
        type: choice
        options:
          - CCSDEV
-         - C2MTEST
+         - CCSTEST
+         - CCSUAT
+         - CCSPROD
 permissions:
  contents: write
  pull-requests: write
@@ -42,7 +44,9 @@ jobs:
        run: |
          $target="${{ inputs.target_env }}"
          switch ($target) {
-           "C2MTEST" { $src="CCSDEV" }
+           "CCSTEST" { $src="CCSDEV" }
+           "CCSUAT" { $src="CCSDEV" }
+           "CCSPROD" { $src="CCSDEV" }
            "CCSDEV" { $src="CCSDEV" }
            default { throw "Invalid promotion target" }
          }
@@ -67,35 +71,7 @@ jobs:
          git commit -m "Promote $folder ($tag)" --allow-empty
          git push origin $tempBranch --force
          "TEMP_BRANCH=$tempBranch" | Out-File $env:GITHUB_OUTPUT -Append
-     - name: Create PR
-       if: ${{ steps.resolve.outputs.TARGET_ENV == 'CCSDEV' }}
-       shell: pwsh
-       env:
-         GH_TOKEN: ${{ github.token }}
-       run: |
-         $branch="${{ steps.branch.outputs.TEMP_BRANCH }}"
-         $target="${{ steps.resolve.outputs.TARGET_ENV }}"
-         $folder="${{ steps.extract.outputs.CMA_FOLDER }}"
-         $tag="${{ inputs.release_tag }}"
-         $title="Promote $folder ($tag) to $target"
-         $body="Automated promotion for CMA folder $folder"
-         $existingPR = gh pr list `
-           --base $target `
-           --head $branch `
-           --state open `
-           --json number `
-           --jq '.[0].number'
-         if ($existingPR) {
-           Write-Host "PR already exists (#$existingPR). It will be updated automatically by the new commit."
-         } else {
-           Write-Host "Creating PR..."
-           gh pr create `
-             --base $target `
-             --head $branch `
-             --title "$title" `
-             --body "$body"
-         }
-     - name: Create PR via peter-evans (non-DEV)
+     - name: Create PR for non-DEV environments
        if: ${{ steps.resolve.outputs.TARGET_ENV != 'CCSDEV' }}
        uses: peter-evans/create-pull-request@v6
        with:
@@ -104,7 +80,7 @@ jobs:
          branch: ${{ steps.branch.outputs.TEMP_BRANCH }}
          title: "Promote ${{ steps.extract.outputs.CMA_FOLDER }} (${{ github.event.inputs.release_tag }}) to ${{ steps.resolve.outputs.TARGET_ENV }}"
          body: "Automated promotion for CMA folder ${{ steps.extract.outputs.CMA_FOLDER }}"
-         reviewers: "" # empty = use CODEOWNERS automatically
+         reviewers: "" # empty → uses CODEOWNERS automatically
  promote-and-upload:
    needs: promote-pr
    runs-on: ubuntu-latest
